@@ -1,7 +1,8 @@
+/* 1. Global Setup */
 body {
-    background-color: #0b0e14; /* Deep industrial charcoal */
+    background-color: #0b0e14;
     color: #e0e6ed;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', sans-serif;
     margin: 0;
     padding: 20px;
     display: flex;
@@ -9,107 +10,71 @@ body {
     align-items: center;
 }
 
-/* Header Style */
-h1 {
-    font-weight: 300;
-    letter-spacing: 2px;
-    color: #ffffff;
-    text-transform: uppercase;
-    margin-bottom: 5px;
-}
+.header { margin-bottom: 30px; }
+h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0; }
 
-p {
-    color: #8892b0;
-    margin-bottom: 30px;
-}
-
-/* The Responsive Grid Container */
+/* 2. Grid Container */
 .container {
     display: grid;
-    /* This ensures 3 columns on desktop, 1 on mobile */
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 25px;
+    gap: 20px;
     width: 100%;
     max-width: 1200px;
 }
 
-/* Glass-Style Information Cards */
+/* 3. Sensor Cards */
 .card {
-    background: rgba(255, 255, 255, 0.03); /* Subtle transparency */
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 30px;
-    text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    position: relative;
-}
-
-.card:hover {
-    transform: translateY(-10px);
-    border-color: #00ff88; /* Neon Green glow on hover */
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.card h3 {
-    font-size: 0.9rem;
-    color: #8892b0;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-top: 0;
-}
-
-/* Large Digital Readouts */
-.value {
-    font-size: 3.5rem;
-    font-weight: 700;
-    color: #00ff88;
-    margin: 20px 0;
-    font-family: 'Courier New', Courier, monospace; /* Digital meter look */
-    text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-}
-
-/* Professional Status Indicators */
-.status-light {
-    height: 6px;
-    width: 60%;
-    margin: 0 auto;
-    background-color: #2d333f;
-    border-radius: 10px;
-    position: relative;
-}
-
-/* Glow Effects for Statuses */
-.normal { 
-    background-color: #00ff88; 
-    box-shadow: 0 0 15px #00ff88; 
-}
-.warning { 
-    background-color: #ffcc00; 
-    box-shadow: 0 0 15px #ffcc00; 
-}
-.critical { 
-    background-color: #ff4444; 
-    box-shadow: 0 0 15px #ff4444; 
-}
-
-/* Graph/Chart Box - Spans Full Width */
-.chart-box {
-    grid-column: 1 / -1; /* Professional trick to span all grid columns */
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     padding: 25px;
-    height: 400px; /* Large area for the trend graph */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    transition: 0.3s;
 }
 
-/* Mobile Responsiveness Adjustments */
-@media (max-width: 768px) {
-    .value {
-        font-size: 2.5rem;
-    }
-    .container {
-        grid-template-columns: 1fr; /* Stack cards on top of each other on phones */
-    }
+.card:hover { transform: translateY(-5px); border-color: #00ff88; }
+
+.value {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #00ff88;
+    margin: 15px 0;
+    font-family: 'Courier New', monospace;
+}
+
+/* 4. Status Indicators */
+.status-light {
+    height: 8px;
+    width: 60%;
+    margin: 0 auto;
+    background-color: #333;
+    border-radius: 4px;
+}
+
+.normal { background-color: #00ff88; box-shadow: 0 0 10px #00ff88; }
+.warning { background-color: #ffcc00; box-shadow: 0 0 10px #ffcc00; }
+.critical { background-color: #ff4444; box-shadow: 0 0 10px #ff4444; }
+
+/* 5. AI Box Styling */
+.ai-box {
+    grid-column: 1 / -1;
+    background: rgba(0, 255, 136, 0.05);
+    border: 1px dashed #00ff88;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: left;
+}
+
+.ai-box h3 { color: #00ff88; margin: 0 0 10px 0; font-size: 1.1rem; }
+#ai-suggestion { font-weight: bold; font-size: 1.2rem; margin: 5px 0; }
+#ai-action-step { color: #8892b0; font-style: italic; }
+
+/* 6. Chart Box */
+.chart-box {
+    grid-column: 1 / -1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    height: 400px;
 }
