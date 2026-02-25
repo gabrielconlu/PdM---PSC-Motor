@@ -71,10 +71,21 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
 
 /* 6. Chart Box */
 .chart-box {
-    grid-column: 1 / -1;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 20px;
-    height: 400px;
+    grid-column: 1 / -1; 
+    background-color: #1a1a1a;
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid #2a2a2a;
+    margin-top: 15px;
+    height: 350px; /* Fixed height for better control */
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5); /* Inner shadow for depth */
+}
+
+.chart-header {
+    text-align: left;
+    margin-bottom: 10px;
+    color: #888;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
