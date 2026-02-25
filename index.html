@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Motor Maintenance System</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="header">
+        <h1>PSC Motor Health Monitor</h1>
+        <p>Status: <span id="connection-status">Online</span></p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3>Temperature</h3>
+            <div class="value" id="temp-display">0°C</div>
+            <div class="status-light" id="temp-light"></div>
+        </div>
+
+        <div class="card">
+            <h3>Current (RMS)</h3>
+            <div class="value" id="curr-display">0A</div>
+            <div class="status-light" id="curr-light"></div>
+        </div>
+
+        <div class="card">
+             <h3>Vibration Intensity</h3>
+             <div class="value" id="vib-display">0.00G</div>
+             <div class="status-light" id="vib-light"></div>    
+        </div>    
+
+        <div class="chart-box">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
