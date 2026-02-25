@@ -1,23 +1,63 @@
 const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5mqgSHNE1hEN16oy48V5y4MUWB47KwxqAsM-etDURXfswMw3iOXE2gfqpUo4Rni5nF1k0BsANqWXi/pub?gid=387970785&single=true&output=csv"; 
 
 // Initialize Chart
+// Replace the Chart initialization in your script.js with this:
 const ctx = document.getElementById('myChart').getContext('2d');
+
 let myChart = new Chart(ctx, {
     type: 'line',
     data: {
-        labels: [],
+        labels: [], // Time stamps
         datasets: [
-            { label: 'Temp (°C)', data: [], borderColor: '#ff4444', yAxisID: 'y' },
-            { label: 'Current (A)', data: [], borderColor: '#00ccff', yAxisID: 'y1' },
-            { label: 'Vibration (G)', data: [], borderColor: '#00ff88', yAxisID: 'y1' }
+            {
+                label: 'Temp',
+                data: [],
+                borderColor: '#ff4444',
+                borderWidth: 2,
+                pointRadius: 0, // Hides the dots for a cleaner line
+                tension: 0.3,   // Smooths the line
+                fill: false
+            },
+            {
+                label: 'Current',
+                data: [],
+                borderColor: '#00ccff',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.3,
+                fill: false
+            },
+            {
+                label: 'Vibration',
+                data: [],
+                borderColor: '#00ff88',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.3,
+                fill: false
+            }
         ]
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#888', font: { size: 12 } }
+            }
+        },
         scales: {
-            y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp' } },
-            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Amps / G' } }
+            x: {
+                grid: { display: false }, // Hide vertical lines for simplicity
+                ticks: { color: '#555', maxRotation: 0 }
+            },
+            y: {
+                grid: { color: '#222' }, // Very faint horizontal lines
+                ticks: { color: '#555' },
+                title: { display: false }
+            }
         }
     }
 });
