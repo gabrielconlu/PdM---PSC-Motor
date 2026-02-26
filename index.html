@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSC Motor | Predictive Maintenance Dashboard</title>
+    <title>PSC Motor | Predictive Maintenance</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -28,40 +28,35 @@
         </div>
 
         <div class="card">
-             <h3>Vibration Intensity</h3>
+             <h3>Vibration</h3>
              <div class="value" id="vib-display">0.00G</div>
              <div class="status-light" id="vib-light"></div>    
         </div>
 
-
         <div class="ai-box">
             <h3>✨ AI Maintenance Assistant</h3>
-            <p id="ai-suggestion">Analyzing motor health data...</p>
+            <p id="ai-suggestion">Initialising Heuristic Engine...</p>
             <div id="ai-action-step">System Baseline: Operational</div>
         </div>
 
         <div class="chart-box">
-            <div class="chart-header">Historical Sensor Correlation</div>
             <canvas id="myChart"></canvas>
         </div>
 
         <div class="card health-card">
-            <h3>PSC Motor Health Score</h3>
-            <div class="value" id="health-score" style="color: #00ff88;">100%</div>
-            <p id="health-status">Excellent</p>
+            <h3>Motor Health Score</h3>
+            <div class="value" id="motor-health-score">100%</div>
+            <p id="motor-health-status">Excellent</p>
         </div>
 
         <div class="log-box">
             <h3>Maintenance Event Log</h3>
             <ul id="event-list">
-                <li>[SYSTEM START]: Monitoring initiated...</li>
+                <li class="system-init">[SYSTEM START]: Monitoring initiated...</li>
             </ul>
         </div>
-
     </div>
 
     <script src="script.js"></script>
 </body>
 </html>
-
-
