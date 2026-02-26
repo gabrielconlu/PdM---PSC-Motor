@@ -10,7 +10,7 @@ body {
     align-items: center;
 }
 
-.header { margin-bottom: 30px; }
+.header { text-align: center; margin-bottom: 30px; }
 h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0; }
 
 /* 2. Grid Container */
@@ -22,7 +22,7 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     max-width: 1200px;
 }
 
-/* 3. Sensor Cards */
+/* 3. Sensor Cards (Top Row) */
 .card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -62,41 +62,11 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     border: 1px dashed #00ff88;
     border-radius: 16px;
     padding: 20px;
-    text-align: left;
 }
 
 .ai-box h3 { color: #00ff88; margin: 0 0 10px 0; font-size: 1.1rem; }
 #ai-suggestion { font-weight: bold; font-size: 1.2rem; margin: 5px 0; }
 #ai-action-step { color: #8892b0; font-style: italic; }
-
-.health-card { border: 2px solid #333; }
-#health-status { font-size: 0.9rem; color: #888; margin: 0; }
-
-.log-box {
-    grid-column: 1 / -1;
-    background: #111;
-    border: 1px solid #222;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: left;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.log-box h3 { font-size: 1rem; color: #555; margin-top: 0; }
-
-#event-list {
-    list-style: none;
-    padding: 0;
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #00ff88;
-}
-
-#event-list li {
-    padding: 5px 0;
-    border-bottom: 1px solid #222;
-}
 
 /* 6. Chart Box */
 .chart-box {
@@ -105,16 +75,49 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     padding: 25px;
     border-radius: 12px;
     border: 1px solid #2a2a2a;
-    margin-top: 15px;
-    height: 350px; /* Fixed height for better control */
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5); /* Inner shadow for depth */
+    height: 350px;
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
 }
 
-.chart-header {
-    text-align: left;
-    margin-bottom: 10px;
-    color: #888;
-    font-size: 0.9rem;
+/* 7. Health Score Card (Positioned below the middle of the chart) */
+.health-card {
+    grid-column: 1 / -1; 
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,255,136,0.08) 100%);
+    border: 2px solid #333;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+#health-status { 
+    font-size: 1.1rem; 
+    color: #888; 
+    margin-top: 10px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+}
+
+/* 8. Log Box (Bottom) */
+.log-box {
+    grid-column: 1 / -1;
+    background: #000;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 20px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.log-box h3 { font-size: 0.9rem; color: #555; margin-top: 0; text-transform: uppercase; }
+
+#event-list {
+    list-style: none;
+    padding: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+#event-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #111;
+    color: #00ff88;
 }
