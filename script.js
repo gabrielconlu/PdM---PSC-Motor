@@ -3,8 +3,13 @@ const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5mqgSHNE1hEN16oy4
 // AI Memory & Master's Level Analytics Variables
 let prevData = { t: 0, c: 0, v: 0 };
 let lastFaultStatus = "";
-let rollingTempBaseline = []; // For Dynamic Thresholding
-let faultPersistenceCounter = 0; // Debouncing to prevent false positives
+let rollingTempBaseline = []; 
+let faultPersistenceCounter = 0; 
+
+// --- NEW: Calibration Variables for Aging Motors ---
+let isCalibrated = false;
+let calibrationBuffer = [];
+let ambientBaseline = { t: 0, v: 0 }; 
 
 // Initialize Chart
 const ctx = document.getElementById('myChart').getContext('2d');
@@ -45,10 +50,13 @@ async function updateDashboard() {
         document.getElementById('curr-display').innerText = curr.toFixed(2) + "A";
         document.getElementById('vib-display').innerText = vib.toFixed(2) + "G";
 
+        // 1. RUN CALIBRATION FIRST
+        if (!isCalibrated) {
+            runCalibration(temp, vib);
+        }
+
         updateStatusLights(temp, curr, vib);
         const health = calculateHealth(temp, curr, vib);
-        
-        // Advanced AI Logic Execution
         runAdvancedAI(temp, curr, vib, health);
 
         const history = dataRows.slice(-15);
@@ -62,11 +70,36 @@ async function updateDashboard() {
     } catch (e) { console.error("Update Error:", e); }
 }
 
+// NEW: Calibration Function
+function runCalibration(t, v) {
+    const sugg = document.getElementById('ai-suggestion');
+    const act = document.getElementById('ai-action-step');
+    
+    calibrationBuffer.push({t, v});
+    sugg.innerText = `CALIBRATING AI... (${calibrationBuffer.length}/6)`;
+    act.innerText = "Learning current motor baseline for precision diagnostic.";
+
+    if (calibrationBuffer.length >= 6) {
+        ambientBaseline.t = calibrationBuffer.reduce((sum, item) => sum + item.t, 0) / 6;
+        ambientBaseline.v = calibrationBuffer.reduce((sum, item) => sum + item.v, 0) / 6;
+        isCalibrated = true;
+        logEvent(`SYSTEM: Calibration Complete. Baseline: ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
+    }
+}
+
 function calculateHealth(t, c, v) {
+    if (!isCalibrated) return 100;
+
     let score = 100;
-    if (t > 45) score -= (t - 45) * 2;
-    if (c > 4) score -= (c - 4) * 10;
-    if (v > 1.5) score -= (v - 1.5) * 15;
+    
+    // Using Deviation-based scoring instead of fixed thresholds
+    const tempDev = t - ambientBaseline.t;
+    const vibDev = v - ambientBaseline.v;
+
+    if (tempDev > 5) score -= tempDev * 2;   // Penalty for rising above its own normal
+    if (vibDev > 0.5) score -= vibDev * 15;  // Penalty for increased shaking
+    if (c > 4) score -= (c - 4) * 10;        // Current remains absolute (electrical limit)
+    
     score = Math.max(0, Math.min(100, score));
     
     const hDisplay = document.getElementById('motor-health-score');
@@ -74,74 +107,84 @@ function calculateHealth(t, c, v) {
     if(hDisplay) {
         hDisplay.innerText = Math.round(score) + "%";
         hDisplay.style.color = score > 80 ? "#00ff88" : score > 50 ? "#ffcc00" : "#ff4444";
-        hStatus.innerText = score > 80 ? "Excellent" : score > 50 ? "Maintenance Needed" : "Critical Failure Risk";
+        hStatus.innerText = score > 80 ? "Nominal Baseline" : score > 50 ? "Maintenance Recommended" : "Urgent Intervention Needed";
     }
     return score;
 }
 
 function runAdvancedAI(t, c, v, h) {
+    if (!isCalibrated) return;
+
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
     
-    // 1. DYNAMIC BASELINE CALCULATION (Master's Prep)
     rollingTempBaseline.push(t);
     if(rollingTempBaseline.length > 10) rollingTempBaseline.shift();
     const avgTemp = rollingTempBaseline.reduce((a, b) => a + b) / rollingTempBaseline.length;
     
-    // 2. RATE OF CHANGE (RoC) ANALYSIS
     const tempRateOfChange = t - prevData.t;
-    const vibRateOfChange = v - prevData.v;
 
     let diag = "SYSTEM HEALTHY";
-    let advice = "Condition-based monitoring active. No anomalies.";
+    let advice = "Heuristic monitoring active. Parameters stabilized.";
     let anomalyDetected = false;
 
-    // HEURISTIC INFERENCE ENGINE
-    if (t > (avgTemp + 5) && vibRateOfChange > 0.3) {
-        diag = "PROGNOSTIC: UNUSUAL THERMAL DRIFT";
-        advice = "Temp is rising faster than baseline with vibration spikes. Check bearings.";
+    // AI CORRELATION LOGIC (Data Fusion)
+    if (t > (ambientBaseline.t + 10) && v > (ambientBaseline.v + 1.0)) {
+        diag = "PROGNOSTIC: ADVANCED BEARING WEAR";
+        advice = "Correlation detected: High heat + Increased vibration. Bearing service required.";
         anomalyDetected = true;
     } 
-    else if (t > 51 && v > 2.5) {
-        diag = "CRITICAL: MECHANICAL SEIZURE RISK";
-        advice = "High friction detected. Emergency stop advised to prevent winding burnout.";
+    else if (c > 5 && tempRateOfChange > 1.2) {
+        diag = "ALGORITHM: ELECTRICAL OVERLOAD";
+        advice = "Rapid thermal spike with high amperage. Check motor load.";
         anomalyDetected = true;
     }
-    else if (c > 5 && tempRateOfChange > 1.5) {
-        diag = "ALGORITHM ALERT: THERMAL RUNAWAY";
-        advice = "Current surge correlated with rapid heat increase. Inspect ventilation.";
-        anomalyDetected = true;
-    }
-    else if (h < 85 && h > 70) {
-        diag = "PREDICTIVE: EARLY STAGE WEAR";
-        advice = "Health score degrading. Plan inspection within next 50 operating hours.";
+    else if (h < 75) {
+        diag = "PREDICTIVE: PERFORMANCE DEVIATION";
+        advice = "Motor is operating outside learned baseline. Schedule routine check.";
         anomalyDetected = true;
     }
 
-    // 3. DEBOUNCING / PERSISTENCE LOGIC (Panel-Suggested Reliability)
     if (anomalyDetected) {
         faultPersistenceCounter++;
     } else {
         faultPersistenceCounter = 0;
     }
 
-    if (faultPersistenceCounter >= 2) { // Must be true for 2 consecutive cycles
+    if (faultPersistenceCounter >= 2) {
         sugg.innerText = diag;
         act.innerText = advice;
         if (diag !== lastFaultStatus) {
-            logEvent(`AI DIAGNOSTIC: ${diag}`);
+            logEvent(`AI ALERT: ${diag}`);
             lastFaultStatus = diag;
         }
     } else {
-        sugg.innerText = "SYSTEM HEALTHY: Monitoring Patterns...";
-        act.innerText = "Heuristic baseline stabilized.";
+        sugg.innerText = "SYSTEM HEALTHY: Analysis Active";
+        act.innerText = "Baseline deviation within tolerance.";
         lastFaultStatus = "";
     }
 }
 
-// ... include updateStatusLights, setLight, and logEvent from previous version ...
-function updateStatusLights(t, c, v) { setLight('temp-light', t, 46, 51); setLight('curr-light', c, 4, 5); setLight('vib-light', v, 1.5, 2.5); }
-function setLight(id, val, warn, crit) { const el = document.getElementById(id); if(!el) return; el.className = "status-light " + (val >= crit ? 'critical' : val >= warn ? 'warning' : 'normal'); }
+function updateStatusLights(t, c, v) { 
+    // Status lights can stay absolute for safety standards
+    setLight('temp-light', t, 46, 51); 
+    setLight('curr-light', c, 4, 5); 
+    setLight('vib-light', v, 1.5, 2.5); 
+}
+
+function setLight(id, val, warn, crit) { 
+    const el = document.getElementById(id); 
+    if(!el) return; 
+    el.className = "status-light " + (val >= crit ? 'critical' : val >= warn ? 'warning' : 'normal'); 
+}
+
+function logEvent(msg) {
+    const list = document.getElementById('event-list');
+    if(!list) return;
+    const entry = document.createElement('li');
+    entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    list.prepend(entry);
+}
 
 setInterval(updateDashboard, 5000);
 updateDashboard();
