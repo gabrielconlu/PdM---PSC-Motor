@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PSC Motor | Predictive Maintenance Dashboard</title>
-    
     <link rel="stylesheet" href="style.css">
-    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -17,7 +15,6 @@
     </div>
 
     <div class="container">
-        
         <div class="card">
             <h3>Temperature</h3>
             <div class="value" id="temp-display">0.0°C</div>
@@ -25,7 +22,7 @@
         </div>
 
         <div class="card">
-            <h3>RMS Current</h3>
+            <h3>Current (RMS)</h3>
             <div class="value" id="curr-display">0.00A</div>
             <div class="status-light" id="curr-light"></div>
         </div>
@@ -34,16 +31,30 @@
              <h3>Vibration Intensity</h3>
              <div class="value" id="vib-display">0.00G</div>
              <div class="status-light" id="vib-light"></div>    
-        </div>    
+        </div>
+
+        <div class="card health-card">
+            <h3>System Health Score</h3>
+            <div class="value" id="health-score" style="color: #00ff88;">100%</div>
+            <p id="health-status">Excellent</p>
+        </div>
 
         <div class="ai-box">
-            <h3><span class="sparkle">✨</span> AI Maintenance Assistant</h3>
+            <h3>✨ AI Maintenance Assistant</h3>
             <p id="ai-suggestion">Analyzing motor health data...</p>
             <div id="ai-action-step">System Baseline: Operational</div>
         </div>
 
         <div class="chart-box">
+            <div class="chart-header">Historical Sensor Correlation</div>
             <canvas id="myChart"></canvas>
+        </div>
+
+        <div class="log-box">
+            <h3>Maintenance Event Log</h3>
+            <ul id="event-list">
+                <li>[SYSTEM START]: Monitoring initiated...</li>
+            </ul>
         </div>
 
     </div>
