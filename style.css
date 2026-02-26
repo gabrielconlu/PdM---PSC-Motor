@@ -69,6 +69,35 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
 #ai-suggestion { font-weight: bold; font-size: 1.2rem; margin: 5px 0; }
 #ai-action-step { color: #8892b0; font-style: italic; }
 
+.health-card { border: 2px solid #333; }
+#health-status { font-size: 0.9rem; color: #888; margin: 0; }
+
+.log-box {
+    grid-column: 1 / -1;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: left;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.log-box h3 { font-size: 1rem; color: #555; margin-top: 0; }
+
+#event-list {
+    list-style: none;
+    padding: 0;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #00ff88;
+}
+
+#event-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid #222;
+}
+
 /* 6. Chart Box */
 .chart-box {
     grid-column: 1 / -1; 
