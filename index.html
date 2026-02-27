@@ -33,10 +33,14 @@
              <div class="status-light" id="vib-light"></div>    
         </div>
 
-        <div class="ai-box">
+        <div class="ai-box" id="ai-container">
             <h3>✨ AI Maintenance Assistant</h3>
-            <p id="ai-suggestion">Initialising Heuristic Engine...</p>
-            <div id="ai-action-step">System Baseline: Operational</div>
+            <p id="ai-suggestion">Waiting for Motor Start...</p>
+            <div id="ai-action-step" class="ai-subtext">Initializing Heuristic Engine...</div>
+            
+            <div id="calib-progress-container" style="display:none; width:100%; background:#222; height:8px; border-radius:4px; margin-top:10px;">
+                <div id="calib-progress-bar" style="width:0%; background:#00ccff; height:100%; border-radius:4px; transition: width 0.5s;"></div>
+            </div>
         </div>
 
         <div class="chart-box">
@@ -50,10 +54,12 @@
         </div>
 
         <div class="log-box">
-            <h3>Maintenance Event Log</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Maintenance Event Log</h3>
+                <button onclick="clearHistory()" class="clear-btn">Clear Logs</button>
+            </div>
             <ul id="event-list">
-                <li class="system-init">[SYSTEM START]: Monitoring initiated...</li>
-            </ul>
+                </ul>
         </div>
     </div>
 
