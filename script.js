@@ -3,7 +3,6 @@ const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5mqgSHNE1hEN16oy4
 // AI Memory & Analytics Variables
 let prevData = { t: 0, c: 0, v: 0 };
 let lastFaultStatus = "";
-let rollingTempBaseline = []; 
 let faultPersistenceCounter = 0; 
 
 // Calibration & State Management
@@ -39,10 +38,13 @@ window.onload = function() {
     const list = document.getElementById('event-list');
     const savedLogs = JSON.parse(localStorage.getItem('motorLogs')) || [];
     
-    savedLogs.reverse().forEach(log => {
+    // Clear initial placeholder if data exists
+    if(savedLogs.length > 0 && list) list.innerHTML = "";
+
+    savedLogs.forEach(log => {
         const entry = document.createElement('li');
         entry.innerText = log;
-        if(list) list.prepend(entry);
+        if(list) list.appendChild(entry);
     });
     
     logEvent("DASHBOARD ACTIVE: Session restored.");
@@ -76,11 +78,22 @@ async function updateDashboard() {
         document.getElementById('curr-display').innerText = curr.toFixed(2) + "A";
         document.getElementById('vib-display').innerText = vib.toFixed(2) + "G";
 
-        if (!isCalibrated && motorRunning) runCalibration(temp, vib);
+        // Handle Calibration vs Advanced AI
+        if (motorRunning) {
+            if (!isCalibrated) {
+                runCalibration(temp, vib);
+            } else {
+                const health = calculateHealth(temp, curr, vib);
+                runAdvancedAI(temp, curr, vib, health);
+            }
+        } else {
+            // Standby UI
+            document.getElementById('ai-suggestion').innerText = "STANDBY MODE";
+            document.getElementById('ai-action-step').innerText = "Waiting for motor startup...";
+            document.getElementById('ai-container').className = "ai-box";
+        }
 
         updateStatusLights(temp, curr, vib);
-        const health = calculateHealth(temp, curr, vib);
-        runAdvancedAI(temp, curr, vib, health);
 
         // Update Chart
         const history = dataRows.slice(-20);
@@ -98,34 +111,45 @@ function resetCalibration() {
     isCalibrated = false;
     calibrationBuffer = [];
     ambientBaseline = { t: 0, v: 0 };
+    document.getElementById('calib-progress-bar').style.width = "0%";
 }
 
-// RESTORED UI (1/6) Logic
 function runCalibration(t, v) {
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
+    const container = document.getElementById('ai-container');
+    const progBar = document.getElementById('calib-progress-bar');
+    const progCont = document.getElementById('calib-progress-container');
     
     calibrationBuffer.push({t, v});
     
-    // Display the specific step count
-    sugg.innerText = `CALIBRATING AI: (${calibrationBuffer.length}/6)`;
+    // UI Feedback: Blue Mode
+    container.classList.add('ai-calibrating');
+    progCont.style.display = "block";
+    
+    let count = calibrationBuffer.length;
+    let percent = (count / 6) * 100;
+    
+    progBar.style.width = percent + "%";
+    sugg.innerText = `CALIBRATING AI: (${count}/6)`;
     act.innerText = "Learning current motor baseline for precision diagnostics...";
 
-    if (calibrationBuffer.length >= 6) {
+    if (count >= 6) {
         ambientBaseline.t = calibrationBuffer.reduce((a, b) => a + b.t, 0) / 6;
         ambientBaseline.v = calibrationBuffer.reduce((a, b) => a + b.v, 0) / 6;
         isCalibrated = true;
         
         logEvent(`CALIBRATED: Baseline set to ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
         
-        // Immediate switch to monitoring view
+        // Reset UI to Monitoring Mode
+        container.classList.remove('ai-calibrating');
+        progCont.style.display = "none";
         sugg.innerText = "MONITORING ACTIVE";
         act.innerText = "Heuristic analysis: Normal Operation";
     }
 }
 
 function calculateHealth(t, c, v) {
-    if (!isCalibrated || !motorRunning) return 100;
     let score = 100;
     const tempDev = t - ambientBaseline.t;
     const vibDev = v - ambientBaseline.v;
@@ -136,24 +160,20 @@ function calculateHealth(t, c, v) {
     
     score = Math.max(0, Math.min(100, score));
     const hDisplay = document.getElementById('motor-health-score');
-    if(hDisplay) hDisplay.innerText = Math.round(score) + "%";
+    if(hDisplay) {
+        hDisplay.innerText = Math.round(score) + "%";
+        document.getElementById('motor-health-status').innerText = score > 80 ? "Excellent" : score > 50 ? "Caution" : "Critical";
+    }
     return score;
 }
 
 function runAdvancedAI(t, c, v, h) {
-    if (!isCalibrated || !motorRunning) {
-        if (!motorRunning) {
-            document.getElementById('ai-suggestion').innerText = "STANDBY MODE";
-            document.getElementById('ai-action-step').innerText = "Waiting for motor startup...";
-        }
-        return;
-    }
-    
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
+    const container = document.getElementById('ai-container');
     const tempRate = (t - prevData.t);
 
-    let diag = "SYSTEM HEALTHY";
+    let diag = "MONITORING ACTIVE";
     let advice = "Heuristic analysis: Normal Operation";
     let anomaly = false;
 
@@ -190,13 +210,16 @@ function runAdvancedAI(t, c, v, h) {
     if (faultPersistenceCounter >= 2) {
         sugg.innerText = diag;
         act.innerText = advice;
+        container.classList.add('ai-alert');
         if (diag !== lastFaultStatus) {
             logEvent(`AI ALERT: ${diag}`);
             lastFaultStatus = diag;
         }
     } else {
-        sugg.innerText = "MONITORING";
+        sugg.innerText = "MONITORING ACTIVE";
         act.innerText = "Heuristic analysis active.";
+        container.classList.remove('ai-alert');
+        lastFaultStatus = "";
     }
 }
 
@@ -210,19 +233,24 @@ function logEvent(msg) {
     list.prepend(entry);
 
     let logs = JSON.parse(localStorage.getItem('motorLogs')) || [];
-    logs.push(fullMsg);
-    if(logs.length > 50) logs.shift();
+    logs.unshift(fullMsg); // Add to beginning of array
+    if(logs.length > 50) logs.pop();
     localStorage.setItem('motorLogs', JSON.stringify(logs));
 }
 
 function clearHistory() {
-    if(confirm("Clear diagnostic memory?")) {
+    if(confirm("Are you sure you want to clear all maintenance logs?")) {
         localStorage.removeItem('motorLogs');
         location.reload(); 
     }
 }
 
-function updateStatusLights(t, c, v) { setLight('temp-light', t, 48, 55); setLight('curr-light', c, 4.5, 6); setLight('vib-light', v, 1.8, 2.8); }
+function updateStatusLights(t, c, v) { 
+    setLight('temp-light', t, 48, 55); 
+    setLight('curr-light', c, 4.5, 6); 
+    setLight('vib-light', v, 1.8, 2.8); 
+}
+
 function setLight(id, val, warn, crit) { 
     const el = document.getElementById(id); 
     if(!el) return; 
