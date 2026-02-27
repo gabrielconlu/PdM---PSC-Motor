@@ -1,6 +1,6 @@
 const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5mqgSHNE1hEN16oy48V5y4MUWB47KwxqAsM-etDURXfswMw3iOXE2gfqpUo4Rni5nF1k0BsANqWXi/pub?gid=387970785&single=true&output=csv"; 
 
-// AI Memory & Analytics
+// AI Memory & Analytics Variables
 let prevData = { t: 0, c: 0, v: 0 };
 let lastFaultStatus = "";
 let rollingTempBaseline = []; 
@@ -34,20 +34,20 @@ let myChart = new Chart(ctx, {
     }
 });
 
-// --- NEW: PERSISTENCE INITIALIZATION ---
+// --- PERSISTENCE INITIALIZATION ---
 window.onload = function() {
     const list = document.getElementById('event-list');
     const savedLogs = JSON.parse(localStorage.getItem('motorLogs')) || [];
     
-    // Reverse because we use prepend in logEvent
+    // Reverse to show newest at the top
     savedLogs.reverse().forEach(log => {
         const entry = document.createElement('li');
         entry.innerText = log;
-        list.prepend(entry);
+        if(list) list.prepend(entry);
     });
     
     logEvent("DASHBOARD ACTIVE: Session restored.");
-    updateDashboard(); // Run immediately on load
+    updateDashboard(); 
 };
 
 async function updateDashboard() {
@@ -63,14 +63,14 @@ async function updateDashboard() {
         const curr = parseFloat(lastRow[2]) || 0;
         const vib = parseFloat(lastRow[3]) || 0;
 
-        // Auto-Start Detection
+        // Auto-Start Detection (Threshold at 0.2A)
         if (curr > 0.2 && !motorRunning) {
             motorRunning = true;
             resetCalibration(); 
-            logEvent("STARTUP: Motor current detected.");
+            logEvent("STARTUP: Motor current detected. Initializing AI...");
         } else if (curr < 0.1 && motorRunning) {
             motorRunning = false;
-            logEvent("SHUTDOWN: Motor is idle.");
+            logEvent("SHUTDOWN: Motor is now idle.");
         }
 
         document.getElementById('temp-display').innerText = temp.toFixed(1) + "°C";
@@ -83,6 +83,7 @@ async function updateDashboard() {
         const health = calculateHealth(temp, curr, vib);
         runAdvancedAI(temp, curr, vib, health);
 
+        // Update Chart
         const history = dataRows.slice(-20);
         myChart.data.labels = history.map(r => r.split(',')[0].split(' ')[1] || "Live");
         myChart.data.datasets[0].data = history.map(r => parseFloat(r.split(',')[1]) || 0);
@@ -103,13 +104,13 @@ function resetCalibration() {
 function runCalibration(t, v) {
     const sugg = document.getElementById('ai-suggestion');
     calibrationBuffer.push({t, v});
-    sugg.innerText = `LEARNING: ${Math.round((calibrationBuffer.length/6)*100)}%`;
+    sugg.innerText = `LEARNING BASELINE: ${Math.round((calibrationBuffer.length/6)*100)}%`;
 
     if (calibrationBuffer.length >= 6) {
         ambientBaseline.t = calibrationBuffer.reduce((a, b) => a + b.t, 0) / 6;
         ambientBaseline.v = calibrationBuffer.reduce((a, b) => a + b.v, 0) / 6;
         isCalibrated = true;
-        logEvent(`CALIBRATED: Baseline ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
+        logEvent(`CALIBRATED: Normal set to ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
     }
 }
 
@@ -118,9 +119,11 @@ function calculateHealth(t, c, v) {
     let score = 100;
     const tempDev = t - ambientBaseline.t;
     const vibDev = v - ambientBaseline.v;
+
     if (tempDev > 5) score -= tempDev * 3; 
     if (vibDev > 0.4) score -= vibDev * 20;
     if (c > 5) score -= (c - 5) * 15;
+    
     score = Math.max(0, Math.min(100, score));
     const hDisplay = document.getElementById('motor-health-score');
     if(hDisplay) hDisplay.innerText = Math.round(score) + "%";
@@ -132,38 +135,35 @@ function runAdvancedAI(t, c, v, h) {
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
     const tempRate = (t - prevData.t);
+
     let diag = "SYSTEM HEALTHY";
-    let advice = "No anomalies detected.";
+    let advice = "Heuristic analysis: Normal Operation";
     let anomaly = false;
 
-    // 1. THERMAL RUNAWAY (Prognostic)
+    // --- ENHANCED AI DECISION TREE ---
     if (tempRate > 1.5 && t > ambientBaseline.t + 8) {
         diag = "PROGNOSTIC: THERMAL RUNAWAY";
         advice = "Temp rising too fast. Risk of winding melt-down.";
         anomaly = true;
     } 
-    // 2. BEARING WEAR (Sensor Fusion: T + V)
     else if (v > (ambientBaseline.v + 1.2) && t > (ambientBaseline.t + 5)) {
         diag = "DIAGNOSTIC: BEARING FRICTION";
-        advice = "Correlated Heat & Vibration. Lubrication or replacement needed.";
+        advice = "Correlated Heat & Vibration. Maintenance required.";
         anomaly = true;
     }
-    // 3. MECHANICAL LOOSENESS (Vibration only)
     else if (v > (ambientBaseline.v + 2.0)) {
         diag = "ALERT: MECHANICAL INSTABILITY";
-        advice = "High vibration detected. Check mounting bolts or shaft alignment.";
+        advice = "High vibration. Check mounting or shaft alignment.";
         anomaly = true;
     }
-    // 4. ELECTRICAL OVERLOAD (Current + Temp)
     else if (c > 5.0 && t > (ambientBaseline.t + 10)) {
         diag = "CRITICAL: PHASE OVERLOAD";
-        advice = "Excessive current draw causing stator overheating. Reduce load.";
+        advice = "Excessive current causing overheating. Reduce load.";
         anomaly = true;
     }
-    // 5. BLOCKED VENTILATION (Temp only)
     else if (t > (ambientBaseline.t + 15) && v < (ambientBaseline.v + 0.5)) {
         diag = "ADVISORY: COOLING OBSTRUCTION";
-        advice = "High temp without vibration. Check motor fan or air vents.";
+        advice = "High temp without vibration. Check air vents.";
         anomaly = true;
     }
 
@@ -179,29 +179,25 @@ function runAdvancedAI(t, c, v, h) {
         }
     } else {
         sugg.innerText = "MONITORING";
-        act.innerText = "Heuristic analysis: Normal Operation";
+        act.innerText = "Heuristic analysis active.";
     }
 }
 
-// --- UPDATED: PERSISTENT LOGGING ---
 function logEvent(msg) {
     const list = document.getElementById('event-list');
     if(!list) return;
     const fullMsg = `[${new Date().toLocaleTimeString()}] ${msg}`;
     
-    // UI Update
     const entry = document.createElement('li');
     entry.innerText = fullMsg;
     list.prepend(entry);
 
-    // Storage Update
     let logs = JSON.parse(localStorage.getItem('motorLogs')) || [];
     logs.push(fullMsg);
     if(logs.length > 50) logs.shift();
     localStorage.setItem('motorLogs', JSON.stringify(logs));
 }
 
-// --- NEW: UTILITY FUNCTIONS ---
 function clearHistory() {
     if(confirm("Clear diagnostic memory?")) {
         localStorage.removeItem('motorLogs');
