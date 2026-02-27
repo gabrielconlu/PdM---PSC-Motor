@@ -39,7 +39,6 @@ window.onload = function() {
     const list = document.getElementById('event-list');
     const savedLogs = JSON.parse(localStorage.getItem('motorLogs')) || [];
     
-    // Reverse to show newest at the top
     savedLogs.reverse().forEach(log => {
         const entry = document.createElement('li');
         entry.innerText = log;
@@ -101,16 +100,27 @@ function resetCalibration() {
     ambientBaseline = { t: 0, v: 0 };
 }
 
+// RESTORED UI (1/6) Logic
 function runCalibration(t, v) {
     const sugg = document.getElementById('ai-suggestion');
+    const act = document.getElementById('ai-action-step');
+    
     calibrationBuffer.push({t, v});
-    sugg.innerText = `LEARNING BASELINE: ${Math.round((calibrationBuffer.length/6)*100)}%`;
+    
+    // Display the specific step count
+    sugg.innerText = `CALIBRATING AI: (${calibrationBuffer.length}/6)`;
+    act.innerText = "Learning current motor baseline for precision diagnostics...";
 
     if (calibrationBuffer.length >= 6) {
         ambientBaseline.t = calibrationBuffer.reduce((a, b) => a + b.t, 0) / 6;
         ambientBaseline.v = calibrationBuffer.reduce((a, b) => a + b.v, 0) / 6;
         isCalibrated = true;
-        logEvent(`CALIBRATED: Normal set to ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
+        
+        logEvent(`CALIBRATED: Baseline set to ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
+        
+        // Immediate switch to monitoring view
+        sugg.innerText = "MONITORING ACTIVE";
+        act.innerText = "Heuristic analysis: Normal Operation";
     }
 }
 
@@ -131,7 +141,14 @@ function calculateHealth(t, c, v) {
 }
 
 function runAdvancedAI(t, c, v, h) {
-    if (!isCalibrated || !motorRunning) return;
+    if (!isCalibrated || !motorRunning) {
+        if (!motorRunning) {
+            document.getElementById('ai-suggestion').innerText = "STANDBY MODE";
+            document.getElementById('ai-action-step').innerText = "Waiting for motor startup...";
+        }
+        return;
+    }
+    
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
     const tempRate = (t - prevData.t);
