@@ -59,12 +59,12 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
 .warning { background-color: #ffcc00; box-shadow: 0 0 10px #ffcc00; }
 .critical { background-color: #ff4444; box-shadow: 0 0 10px #ff4444; }
 
-/* 5. ENHANCED AI BOX (Revised with States) */
+/* 5. ENHANCED AI BOX */
 .ai-box {
     grid-column: 1 / -1;
     background: rgba(26, 26, 26, 0.8);
     border: 1px solid #333;
-    border-left: 5px solid #00ff88; /* Default healthy state */
+    border-left: 5px solid #00ff88;
     border-radius: 16px;
     padding: 25px;
     position: relative;
@@ -72,17 +72,29 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     transition: all 0.5s ease;
 }
 
-/* AI State: Calibrating (Blue) */
 .ai-calibrating {
     border-left-color: #00ccff !important;
     background: rgba(0, 204, 255, 0.05);
 }
 
-/* AI State: Alert (Red Pulse) */
 .ai-alert {
     border-left-color: #ff4444 !important;
     background: rgba(255, 68, 68, 0.08);
     animation: alert-pulse 2s infinite;
+}
+
+/* AI Text Elements */
+#ai-suggestion {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.ai-subtext {
+    color: #8892b0;
+    font-style: italic;
+    font-size: 0.95rem;
+    margin-top: 5px;
 }
 
 /* Calibration Progress Bar */
@@ -99,28 +111,6 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     background: linear-gradient(90deg, #0088ff, #00ccff);
     width: 0%;
     transition: width 0.5s ease;
-}
-
-/* Scanning Animation (Moved to the background for better readability) */
-.ai-box::after {
-    content: "";
-    position: absolute;
-    top: 0; left: -100%;
-    width: 50%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.05), transparent);
-    animation: scan 4s linear infinite;
-    pointer-events: none;
-}
-
-@keyframes scan {
-    0% { left: -100%; }
-    100% { left: 100%; }
-}
-
-@keyframes alert-pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
-    70% { box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
 }
 
 /* 6. Chart Box */
@@ -141,7 +131,7 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     padding: 30px;
 }
 
-/* 8. REVISED LOG BOX (With Clear Button support) */
+/* 8. REVISED LOG BOX */
 .log-box {
     grid-column: 1 / -1;
     background: #000;
@@ -174,6 +164,7 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     border-color: #ff4444;
 }
 
+/* Event List & Scrollbar Styling */
 #event-list {
     list-style: none;
     padding: 0;
@@ -190,7 +181,43 @@ h1 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin: 0
     animation: slideIn 0.3s ease-out;
 }
 
+#event-list::-webkit-scrollbar {
+    width: 6px;
+}
+#event-list::-webkit-scrollbar-track {
+    background: #000;
+}
+#event-list::-webkit-scrollbar-thumb {
+    background: #222;
+    border-radius: 10px;
+}
+#event-list::-webkit-scrollbar-thumb:hover {
+    background: #00ff88;
+}
+
+/* Animations */
+@keyframes scan {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+@keyframes alert-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+}
+
 @keyframes slideIn {
     from { opacity: 0; transform: translateX(-10px); }
     to { opacity: 1; transform: translateX(0); }
+}
+
+.ai-box::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.05), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
 }
