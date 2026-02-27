@@ -34,6 +34,22 @@ let myChart = new Chart(ctx, {
     }
 });
 
+// --- NEW: PERSISTENCE INITIALIZATION ---
+window.onload = function() {
+    const list = document.getElementById('event-list');
+    const savedLogs = JSON.parse(localStorage.getItem('motorLogs')) || [];
+    
+    // Reverse because we use prepend in logEvent
+    savedLogs.reverse().forEach(log => {
+        const entry = document.createElement('li');
+        entry.innerText = log;
+        list.prepend(entry);
+    });
+    
+    logEvent("DASHBOARD ACTIVE: Session restored.");
+    updateDashboard(); // Run immediately on load
+};
+
 async function updateDashboard() {
     try {
         const response = await fetch(url + "&t=" + new Date().getTime());
@@ -47,30 +63,26 @@ async function updateDashboard() {
         const curr = parseFloat(lastRow[2]) || 0;
         const vib = parseFloat(lastRow[3]) || 0;
 
-        // --- NEW: AUTO-START DETECTION ---
-        // If current jumps from 0 to > 0.2A, the motor just started. Recalibrate!
+        // Auto-Start Detection
         if (curr > 0.2 && !motorRunning) {
             motorRunning = true;
             resetCalibration(); 
-            logEvent("STARTUP: Motor detected. Initializing AI Calibration...");
+            logEvent("STARTUP: Motor current detected.");
         } else if (curr < 0.1 && motorRunning) {
             motorRunning = false;
-            logEvent("SHUTDOWN: Motor stopped. Entering Standby.");
+            logEvent("SHUTDOWN: Motor is idle.");
         }
 
         document.getElementById('temp-display').innerText = temp.toFixed(1) + "°C";
         document.getElementById('curr-display').innerText = curr.toFixed(2) + "A";
         document.getElementById('vib-display').innerText = vib.toFixed(2) + "G";
 
-        if (!isCalibrated && motorRunning) {
-            runCalibration(temp, vib);
-        }
+        if (!isCalibrated && motorRunning) runCalibration(temp, vib);
 
         updateStatusLights(temp, curr, vib);
         const health = calculateHealth(temp, curr, vib);
         runAdvancedAI(temp, curr, vib, health);
 
-        // Update Chart (Last 20 points for better visibility)
         const history = dataRows.slice(-20);
         myChart.data.labels = history.map(r => r.split(',')[0].split(' ')[1] || "Live");
         myChart.data.datasets[0].data = history.map(r => parseFloat(r.split(',')[1]) || 0);
@@ -90,84 +102,73 @@ function resetCalibration() {
 
 function runCalibration(t, v) {
     const sugg = document.getElementById('ai-suggestion');
-    const act = document.getElementById('ai-action-step');
-    
     calibrationBuffer.push({t, v});
-    sugg.innerText = `LEARNING BASELINE: ${Math.round((calibrationBuffer.length/6)*100)}%`;
-    act.innerText = "Analyzing current motor condition to set reference thresholds...";
+    sugg.innerText = `LEARNING: ${Math.round((calibrationBuffer.length/6)*100)}%`;
 
     if (calibrationBuffer.length >= 6) {
         ambientBaseline.t = calibrationBuffer.reduce((a, b) => a + b.t, 0) / 6;
         ambientBaseline.v = calibrationBuffer.reduce((a, b) => a + b.v, 0) / 6;
         isCalibrated = true;
-        logEvent(`CALIBRATION SUCCESS: Normal Temp set to ${ambientBaseline.t.toFixed(1)}°C`);
+        logEvent(`CALIBRATED: Baseline ${ambientBaseline.t.toFixed(1)}°C / ${ambientBaseline.v.toFixed(2)}G`);
     }
 }
 
 function calculateHealth(t, c, v) {
     if (!isCalibrated || !motorRunning) return 100;
-
     let score = 100;
     const tempDev = t - ambientBaseline.t;
     const vibDev = v - ambientBaseline.v;
-
     if (tempDev > 5) score -= tempDev * 3; 
     if (vibDev > 0.4) score -= vibDev * 20;
     if (c > 5) score -= (c - 5) * 15;
-    
     score = Math.max(0, Math.min(100, score));
-    
     const hDisplay = document.getElementById('motor-health-score');
-    const hStatus = document.getElementById('motor-health-status');
-    if(hDisplay) {
-        hDisplay.innerText = Math.round(score) + "%";
-        hDisplay.style.color = score > 80 ? "#00ff88" : score > 50 ? "#ffcc00" : "#ff4444";
-        hStatus.innerText = score > 80 ? "Operational" : score > 50 ? "Performance Degraded" : "Critical Failure Imminent";
-    }
+    if(hDisplay) hDisplay.innerText = Math.round(score) + "%";
     return score;
 }
 
 function runAdvancedAI(t, c, v, h) {
-    if (!isCalibrated || !motorRunning) {
-        if (!motorRunning) {
-            document.getElementById('ai-suggestion').innerText = "STANDBY MODE";
-            document.getElementById('ai-action-step').innerText = "Waiting for motor current to initialize monitoring.";
-        }
-        return;
-    }
-
+    if (!isCalibrated || !motorRunning) return;
     const sugg = document.getElementById('ai-suggestion');
     const act = document.getElementById('ai-action-step');
-    
-    // Prognostics: Rate of Change
-    const tempRate = (t - prevData.t); // Heat gain per 5s
-
+    const tempRate = (t - prevData.t);
     let diag = "SYSTEM HEALTHY";
-    let advice = "Motor running within learned baseline parameters.";
+    let advice = "No anomalies detected.";
     let anomaly = false;
 
-    // --- PROGNOSTIC LOGIC ---
+    // 1. THERMAL RUNAWAY (Prognostic)
     if (tempRate > 1.5 && t > ambientBaseline.t + 8) {
         diag = "PROGNOSTIC: THERMAL RUNAWAY";
-        advice = `Temp rising at ${tempRate.toFixed(1)}°C/interval. Failure expected in < 2 mins.`;
+        advice = "Temp rising too fast. Risk of winding melt-down.";
         anomaly = true;
-    }
+    } 
+    // 2. BEARING WEAR (Sensor Fusion: T + V)
     else if (v > (ambientBaseline.v + 1.2) && t > (ambientBaseline.t + 5)) {
         diag = "DIAGNOSTIC: BEARING FRICTION";
-        advice = "Vibration and heat correlation confirms mechanical wear in bearings.";
+        advice = "Correlated Heat & Vibration. Lubrication or replacement needed.";
         anomaly = true;
     }
-    else if (h < 60) {
-        diag = "CRITICAL: SYSTEM INSTABILITY";
-        advice = "Multiple parameters outside safety envelope. Immediate shutdown advised.";
+    // 3. MECHANICAL LOOSENESS (Vibration only)
+    else if (v > (ambientBaseline.v + 2.0)) {
+        diag = "ALERT: MECHANICAL INSTABILITY";
+        advice = "High vibration detected. Check mounting bolts or shaft alignment.";
+        anomaly = true;
+    }
+    // 4. ELECTRICAL OVERLOAD (Current + Temp)
+    else if (c > 5.0 && t > (ambientBaseline.t + 10)) {
+        diag = "CRITICAL: PHASE OVERLOAD";
+        advice = "Excessive current draw causing stator overheating. Reduce load.";
+        anomaly = true;
+    }
+    // 5. BLOCKED VENTILATION (Temp only)
+    else if (t > (ambientBaseline.t + 15) && v < (ambientBaseline.v + 0.5)) {
+        diag = "ADVISORY: COOLING OBSTRUCTION";
+        advice = "High temp without vibration. Check motor fan or air vents.";
         anomaly = true;
     }
 
-    if (anomaly) {
-        faultPersistenceCounter++;
-    } else {
-        faultPersistenceCounter = 0;
-    }
+    if (anomaly) faultPersistenceCounter++;
+    else faultPersistenceCounter = 0;
 
     if (faultPersistenceCounter >= 2) {
         sugg.innerText = diag;
@@ -177,26 +178,42 @@ function runAdvancedAI(t, c, v, h) {
             lastFaultStatus = diag;
         }
     } else {
-        sugg.innerText = "MONITORING ACTIVE";
-        act.innerText = "Analyzing live telemetry for micro-deviations.";
-        lastFaultStatus = "";
+        sugg.innerText = "MONITORING";
+        act.innerText = "Heuristic analysis: Normal Operation";
     }
 }
 
-// Helper Functions
+// --- UPDATED: PERSISTENT LOGGING ---
+function logEvent(msg) {
+    const list = document.getElementById('event-list');
+    if(!list) return;
+    const fullMsg = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    
+    // UI Update
+    const entry = document.createElement('li');
+    entry.innerText = fullMsg;
+    list.prepend(entry);
+
+    // Storage Update
+    let logs = JSON.parse(localStorage.getItem('motorLogs')) || [];
+    logs.push(fullMsg);
+    if(logs.length > 50) logs.shift();
+    localStorage.setItem('motorLogs', JSON.stringify(logs));
+}
+
+// --- NEW: UTILITY FUNCTIONS ---
+function clearHistory() {
+    if(confirm("Clear diagnostic memory?")) {
+        localStorage.removeItem('motorLogs');
+        location.reload(); 
+    }
+}
+
 function updateStatusLights(t, c, v) { setLight('temp-light', t, 48, 55); setLight('curr-light', c, 4.5, 6); setLight('vib-light', v, 1.8, 2.8); }
 function setLight(id, val, warn, crit) { 
     const el = document.getElementById(id); 
     if(!el) return; 
     el.className = "status-light " + (val >= crit ? 'critical' : val >= warn ? 'warning' : 'normal'); 
 }
-function logEvent(msg) {
-    const list = document.getElementById('event-list');
-    if(!list) return;
-    const entry = document.createElement('li');
-    entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    list.prepend(entry);
-}
 
 setInterval(updateDashboard, 5000);
-updateDashboard();
