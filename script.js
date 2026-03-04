@@ -223,18 +223,21 @@ function runAdvancedAI(t, c, v, h) {
     }
 }
 
+
 function logEvent(msg) {
     const list = document.getElementById('event-list');
     if(!list) return;
-    const fullMsg = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    
+    const fullMsg = `[${new Date().toLocaleString()}] ${msg}`;
     
     const entry = document.createElement('li');
     entry.innerText = fullMsg;
     list.prepend(entry);
 
     let logs = JSON.parse(localStorage.getItem('motorLogs')) || [];
-    logs.unshift(fullMsg); // Add to beginning of array
-    if(logs.length > 50) logs.pop();
+    logs.unshift(fullMsg);
+    
+    if(logs.length > 50) logs.pop(); 
     localStorage.setItem('motorLogs', JSON.stringify(logs));
 }
 
@@ -258,3 +261,4 @@ function setLight(id, val, warn, crit) {
 }
 
 setInterval(updateDashboard, 5000);
+
