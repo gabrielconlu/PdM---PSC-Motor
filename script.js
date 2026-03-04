@@ -223,7 +223,6 @@ function runAdvancedAI(t, c, v, h) {
     }
 }
 
-
 function logEvent(msg) {
     const list = document.getElementById('event-list');
     if(!list) return;
@@ -261,4 +260,5 @@ function setLight(id, val, warn, crit) {
 }
 
 setInterval(updateDashboard, 5000);
+
 
