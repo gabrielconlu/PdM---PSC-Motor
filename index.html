@@ -3,65 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSC Motor | Predictive Maintenance</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Motor AI Diagnostics | 1/2 HP PSC</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <style>
+        body { background: #0f172a; color: #e0e6ed; font-family: sans-serif; margin: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #1e293b; padding: 20px; border-radius: 10px; text-align: center; border-bottom: 4px solid #334155; }
+        #ai-container { background: #1e293b; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 10px solid #3b82f6; transition: 0.3s; }
+        .ai-alert { border-left-color: #ef4444 !important; background: #450a0a !important; }
+        .ai-calibrating { border-left-color: #fbbf24 !important; }
+        .chart-container { height: 400px; background: #1e293b; padding: 15px; border-radius: 10px; }
+        .status-light { width: 15px; height: 15px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .normal { background: #22c55e; } .warning { background: #f59e0b; } .critical { background: #ef4444; }
+        #event-list { height: 150px; overflow-y: auto; background: #000; padding: 10px; font-family: monospace; font-size: 12px; list-style: none; }
+        #calib-progress-container { width: 100%; background: #334155; height: 10px; display: none; margin-top: 10px; }
+        #calib-progress-bar { background: #3b82f6; width: 0%; height: 100%; transition: 0.3s; }
+    </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>PSC Motor Health Monitor</h1>
-        <p>System Status: <span id="connection-status" style="color: #00ff88;">● Live Feed</span></p>
-    </div>
-
-    <div class="container">
-        <div class="card">
-            <h3>Temperature</h3>
-            <div class="value" id="temp-display">0.0°C</div>
-            <div class="status-light" id="temp-light"></div>
+    <h2>Motor Health AI Monitoring System</h2>
+    
+    <div class="grid">
+        <div class="stat-card">
+            <div><span id="temp-light" class="status-light normal"></span> Temperature</div>
+            <h1 id="temp-display">0.0°C</h1>
         </div>
-
-        <div class="card">
-            <h3>Current (RMS)</h3>
-            <div class="value" id="curr-display">0.00A</div>
-            <div class="status-light" id="curr-light"></div>
+        <div class="stat-card">
+            <div><span id="curr-light" class="status-light normal"></span> Current</div>
+            <h1 id="curr-display">0.00A</h1>
         </div>
-
-        <div class="card">
-             <h3>Vibration</h3>
-             <div class="value" id="vib-display">0.00G</div>
-             <div class="status-light" id="vib-light"></div>    
-        </div>
-
-        <div class="ai-box" id="ai-container">
-            <h3>✨ AI Maintenance Assistant</h3>
-            <p id="ai-suggestion">Waiting for Motor Start...</p>
-            <div id="ai-action-step" class="ai-subtext">Initializing Heuristic Engine...</div>
-            
-            <div id="calib-progress-container" style="display:none; width:100%; background:#222; height:8px; border-radius:4px; margin-top:10px;">
-                <div id="calib-progress-bar" style="width:0%; background:#00ccff; height:100%; border-radius:4px; transition: width 0.5s;"></div>
-            </div>
-        </div>
-
-        <div class="chart-box">
-            <canvas id="myChart"></canvas>
-        </div>
-
-        <div class="card health-card">
-            <h3>Motor Health Score</h3>
-            <div class="value" id="motor-health-score">100%</div>
-            <p id="motor-health-status">Excellent</p>
-        </div>
-
-        <div class="log-box">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3>Maintenance Event Log</h3>
-                <button onclick="clearHistory()" class="clear-btn">Clear Logs</button>
-            </div>
-            <ul id="event-list">
-                </ul>
+        <div class="stat-card">
+            <div><span id="vib-light" class="status-light normal"></span> Vibration</div>
+            <h1 id="vib-display">0.00G</h1>
         </div>
     </div>
+
+    <div id="ai-container" class="ai-box">
+        <strong id="ai-suggestion">STANDBY MODE</strong>
+        <p id="ai-action-step">Waiting for motor startup...</p>
+        <div id="calib-progress-container"><div id="calib-progress-bar"></div></div>
+        <div style="margin-top:10px; font-size: 0.8em; opacity: 0.7;">
+            Health Score: <span id="motor-health-score">100%</span> (<span id="motor-health-status">Excellent</span>)
+        </div>
+    </div>
+
+    <div class="chart-container" style="margin-top:20px;">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <h3>Maintenance Event Log</h3>
+    <ul id="event-list"></ul>
+    <button onclick="clearHistory()" style="margin-top:10px; padding: 5px 15px; cursor: pointer;">Clear Logs</button>
 
     <script src="script.js"></script>
 </body>
