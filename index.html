@@ -5,56 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motor AI Diagnostics | 1/2 HP PSC</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
         body { background: #0f172a; color: #e0e6ed; font-family: sans-serif; margin: 20px; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat-card { background: #1e293b; padding: 20px; border-radius: 10px; text-align: center; border-bottom: 4px solid #334155; }
         #ai-container { background: #1e293b; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 10px solid #3b82f6; transition: 0.3s; }
-        .ai-alert { border-left-color: #ef4444 !important; background: #450a0a !important; }
-        .ai-calibrating { border-left-color: #fbbf24 !important; }
-        .chart-container { height: 400px; background: #1e293b; padding: 15px; border-radius: 10px; }
-        .status-light { width: 15px; height: 15px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .chart-container { height: 350px; background: #1e293b; padding: 15px; border-radius: 10px; margin-top: 20px; }
+        .status-light { width: 15px; height: 15px; border-radius: 50%; display: inline-block; margin-right: 5px; background: #444; }
         .normal { background: #22c55e; } .warning { background: #f59e0b; } .critical { background: #ef4444; }
-        #event-list { height: 150px; overflow-y: auto; background: #000; padding: 10px; font-family: monospace; font-size: 12px; list-style: none; }
-        #calib-progress-container { width: 100%; background: #334155; height: 10px; display: none; margin-top: 10px; }
-        #calib-progress-bar { background: #3b82f6; width: 0%; height: 100%; transition: 0.3s; }
+        #event-list { height: 120px; overflow-y: auto; background: #000; padding: 10px; font-family: monospace; font-size: 12px; list-style: none; border-radius: 5px; }
+        
+        /* Button Styling */
+        .btn-connect { background: #3b82f6; color: white; border: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1em; }
+        .btn-connect:hover { background: #2563eb; }
+        .btn-clear { background: #475569; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h2>Motor Health AI Monitoring System</h2>
+
+    <div class="header-flex">
+        <h2>Motor Health AI Monitoring</h2>
+        <button id="connect-btn" class="btn-connect" onclick="connectSerial()">START MONITORING (CONNECT)</button>
+    </div>
     
     <div class="grid">
         <div class="stat-card">
-            <div><span id="temp-light" class="status-light normal"></span> Temperature</div>
+            <div><span id="temp-light" class="status-light"></span> Temperature</div>
             <h1 id="temp-display">0.0°C</h1>
         </div>
         <div class="stat-card">
-            <div><span id="curr-light" class="status-light normal"></span> Current</div>
+            <div><span id="curr-light" class="status-light"></span> Current</div>
             <h1 id="curr-display">0.00A</h1>
         </div>
         <div class="stat-card">
-            <div><span id="vib-light" class="status-light normal"></span> Vibration</div>
+            <div><span id="vib-light" class="status-light"></span> Vibration</div>
             <h1 id="vib-display">0.00G</h1>
         </div>
     </div>
 
-    <div id="ai-container" class="ai-box">
-        <strong id="ai-suggestion">STANDBY MODE</strong>
-        <p id="ai-action-step">Waiting for motor startup...</p>
-        <div id="calib-progress-container"><div id="calib-progress-bar"></div></div>
+    <div id="ai-container">
+        <strong id="ai-suggestion">SYSTEM READY</strong>
+        <p id="ai-action-step">Please click the blue button to connect ESP32...</p>
         <div style="margin-top:10px; font-size: 0.8em; opacity: 0.7;">
-            Health Score: <span id="motor-health-score">100%</span> (<span id="motor-health-status">Excellent</span>)
+            Cloud Sync Status: <span id="sync-status">Idle</span> | 
+            Health Score: <span id="motor-health-score">100%</span>
         </div>
     </div>
 
-    <div class="chart-container" style="margin-top:20px;">
+    <div class="chart-container">
         <canvas id="myChart"></canvas>
     </div>
 
     <h3>Maintenance Event Log</h3>
     <ul id="event-list"></ul>
-    <button onclick="clearHistory()" style="margin-top:10px; padding: 5px 15px; cursor: pointer;">Clear Logs</button>
+    <button class="btn-clear" onclick="clearHistory()">Clear Logs</button>
 
     <script src="script.js"></script>
 </body>
