@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5mqgSHNE1hEN16oy48V5y4MUWB47KwxqAsM-etDURXfswMw3iOXE2gfqpUo4Rni5nF1k0BsANqWXi/pub?gid=387970785&single=true&output=csv"; 
+const url = "https://script.google.com/macros/s/AKfycbxVt2OEhv_YPjhrjvrw7uM0jvkvPeJAOlzwOfVXDiR2030heB3LPt9e9aLYxbnmJK0n/exec"; 
 
 // AI Variables
 let prevData = { t: 0, c: 0, v: 0 };
