@@ -1,5 +1,5 @@
 // --- CONFIGURATION ---
-const url = "https://script.google.com/macros/s/AKfycbxVt2OEhv_YPjhrjvrw7uM0jvkvPeJAOlzwOfVXDiR2030heB3LPt9e9aLYxbnmJK0n/exec"; 
+const url = "https://script.google.com/macros/s/AKfycbzq4DXz6astSv4nKQdvjH7VfsVT9y6qXnb52142_ZaNCIViVi5KjARpV-zWVFdQmwO-/exec"; 
 
 let motorRunning = false;
 let myChart;
