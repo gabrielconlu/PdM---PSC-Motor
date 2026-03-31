@@ -11,15 +11,18 @@
 
     <div class="header">
         <h1>PSC Motor Health AI Monitoring</h1>
+    </div> 
+
     <div class="container">
         <div class="ai-box" id="ai-status-box">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
                     <strong id="ai-suggestion">SYSTEM READY</strong>
+                    <p id="ai-action-step" class="ai-subtext">Click connect to begin logging...</p>
                 </div>
                 <div style="text-align: right;">
                     <button id="connect-btn" class="btn-connect" onclick="connectSerial()">CONNECT ESP32</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="disconnectSerial()" style="display:none;">STOP</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="disconnectSerial()" style="display:none; background:#ef4444;">STOP</button>
                 </div>
             </div>
             
@@ -59,8 +62,6 @@
             </div>
             <ul id="event-list"></ul>
         </div>
-    </div>
-
-    <script src="script.js"></script>
+    </div> <script src="script.js"></script>
 </body>
 </html>
