@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motor AI Diagnostics | Research Edition</title>
+    <title>PSC Motor Health</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,38 +17,33 @@
         <div class="ai-box" id="ai-status-box">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
-                    <strong id="ai-suggestion">SYSTEM READY</strong>
-                    <p id="ai-action-step" class="ai-subtext">Click connect to begin logging...</p>
+                    <strong id="ai-suggestion" style="font-size: 1.2rem;">SYSTEM READY</strong>
+                    <p id="ai-action-step" class="ai-subtext">Waiting for Cloud Sync...</p>
                 </div>
                 <div style="text-align: right;">
-                    <button id="connect-btn" class="btn-connect" onclick="connectSerial()">CONNECT ESP32</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="disconnectSerial()" style="display:none; background:#ef4444;">STOP</button>
-                </div>
-            </div>
-            
-            <div id="calib-container" style="display:none; margin-top: 15px;">
-                <div style="font-size: 0.75rem; color: #00ccff; margin-bottom: 5px;">ESTABLISHING BASELINE (CALIBRATING)...</div>
-                <div id="calib-progress-container">
-                    <div id="calib-progress-bar"></div>
+                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
                 </div>
             </div>
 
-            <div style="margin-top:15px; font-size: 0.8em; opacity: 0.7; display: flex; gap: 20px;">
-                <span>Cloud Sync: <b id="sync-status" style="color: #888;">Idle</b></span>
-                <span>Health Score: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
+            <div class="stats-row">
+                <span>Cloud Status: <b id="sync-status" style="color: #888;">Idle</b></span>
+                <span>Motor Health: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
             </div>
         </div>
 
-        <div class="card">
-            <div class="status-light" id="temp-light"></div>
-            <div style="margin-top:10px; color: #8892b0;">Temperature</div>
-            <div class="value" id="temp-display">0.0°C</div>
-        </div>
+        <div class="metrics-grid">
+            <div class="card">
+                <div class="status-light" id="temp-light"></div>
+                <div class="label">Motor Temperature</div>
+                <div class="value" id="temp-display">0.0°C</div>
+            </div>
 
-        <div class="card">
-            <div class="status-light" id="vib-light"></div>
-            <div style="margin-top:10px; color: #8892b0;">Vibration</div>
-            <div class="value" id="vib-display">0.00G</div>
+            <div class="card">
+                <div class="status-light" id="vib-light"></div>
+                <div class="label">Vibration Intensity</div>
+                <div class="value" id="vib-display">0.00G</div>
+            </div>
         </div>
 
         <div class="chart-box">
@@ -57,11 +52,13 @@
 
         <div class="log-box">
             <div class="log-header">
-                <strong>MAINTENANCE EVENT LOG</strong>
-                <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+                <strong>SYSTEM LOGS</strong>
+                <button class="clear-btn" onclick="clearHistory()" style="font-size: 0.7rem;">Clear</button>
             </div>
             <ul id="event-list"></ul>
         </div>
-    </div> <script src="script.js"></script>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
