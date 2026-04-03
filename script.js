@@ -1,5 +1,5 @@
 // Siguraduhin na ito ang pinakabagong Deployment ID mula sa iyong "New Deployment"
-const url = "https://script.google.com/macros/s/AKfycbwpDizpqZzclgyQzu02s_yLXQM6fJDTHQG6w_g-AN8BNhIDbOQ8uE6mGk8POqWf19ul/exec"; 
+const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec"; 
 
 let myChart;
 let fetchInterval;
