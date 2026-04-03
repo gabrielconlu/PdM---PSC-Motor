@@ -1,4 +1,4 @@
-// Gamitin ang iyong bagong Deployment ID
+// Siguraduhin na ito ang pinakabagong Deployment ID mula sa iyong "New Deployment"
 const url = "https://script.google.com/macros/s/AKfycbwpDizpqZzclgyQzu02s_yLXQM6fJDTHQG6w_g-AN8BNhIDbOQ8uE6mGk8POqWf19ul/exec"; 
 
 let myChart;
@@ -16,16 +16,44 @@ function initChart() {
         data: {
             labels: [],
             datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 2, tension: 0.3, yAxisID: 'y' },
-                { label: 'Vibration (G)', data: [], borderColor: '#22c55e', borderWidth: 2, pointRadius: 2, tension: 0.3, yAxisID: 'y1' }
+                { 
+                    label: 'Temp (°C)', 
+                    data: [], 
+                    borderColor: '#ef4444', 
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 2, 
+                    pointRadius: 2, 
+                    tension: 0.3, 
+                    yAxisID: 'y' 
+                },
+                { 
+                    label: 'Vibration (G)', 
+                    data: [], 
+                    borderColor: '#22c55e', 
+                    borderWidth: 1, 
+                    pointRadius: 0, // Nakatago dahil temp monitoring tayo
+                    tension: 0.3, 
+                    yAxisID: 'y1' 
+                }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { type: 'linear', display: true, position: 'left', ticks: { color: '#ef4444' } },
-                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#22c55e' } }
+                y: { 
+                    type: 'linear', 
+                    display: true, 
+                    position: 'left', 
+                    title: { display: true, text: 'Temperature' },
+                    ticks: { color: '#ef4444' } 
+                },
+                y1: { 
+                    type: 'linear', 
+                    display: false, // Itago ang vibration scale para malinis ang dashboard
+                    position: 'right', 
+                    grid: { drawOnChartArea: false } 
+                }
             }
         }
     });
@@ -33,38 +61,50 @@ function initChart() {
 
 // --- CLOUD SYNC LOGIC ---
 async function startMonitoring() {
-    document.getElementById('connect-btn').style.display = "none";
-    document.getElementById('disconnect-btn').style.display = "inline-block";
+    const connBtn = document.getElementById('connect-btn');
+    const discBtn = document.getElementById('disconnect-btn');
     
-    logEvent("SYSTEM START: Fetching data from Google Sheets...");
+    if(connBtn) connBtn.style.display = "none";
+    if(discBtn) discBtn.style.display = "inline-block";
     
-    // Unang kuha agad ng data
+    logEvent("SYSTEM START: Fetching live data from Google Sheets...");
+    
+    // Initial fetch
     fetchDataFromSheets();
     
-    // Polling every 5 seconds
+    // Polling every 5 seconds (Match sa Arduino delay)
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
 
 async function fetchDataFromSheets() {
     try {
         const syncLabel = document.getElementById('sync-status');
-        syncLabel.innerText = "Fetching...";
-        syncLabel.style.color = "#8892b0";
+        if(syncLabel) {
+            syncLabel.innerText = "Syncing...";
+            syncLabel.style.color = "#8892b0";
+        }
 
-        // Request with cache-buster para laging fresh data
+        // Fetching data with cache-buster
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
+        
+        if (!response.ok) throw new Error('Network response was not ok');
+        
         const data = await response.json();
 
         if (data.temp !== undefined) {
-            updateDashboard(data.temp, data.vibration, data.status);
-            syncLabel.innerText = "Live";
-            syncLabel.style.color = "#00ff88";
+            updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
+            if(syncLabel) {
+                syncLabel.innerText = "Live";
+                syncLabel.style.color = "#00ff88";
+            }
         }
     } catch (e) {
         console.error("Fetch Error:", e);
         const syncLabel = document.getElementById('sync-status');
-        syncLabel.innerText = "Offline";
-        syncLabel.style.color = "#ef4444";
+        if(syncLabel) {
+            syncLabel.innerText = "Offline";
+            syncLabel.style.color = "#ef4444";
+        }
     }
 }
 
@@ -72,31 +112,35 @@ function updateDashboard(t, v, s) {
     const tempVal = parseFloat(t);
     const vibVal = parseFloat(v);
 
-    // Update numerical displays
-    document.getElementById('temp-display').innerText = tempVal.toFixed(1) + "°C";
-    document.getElementById('vib-display').innerText = vibVal.toFixed(2) + "G";
+    // Update displays
+    const tDisp = document.getElementById('temp-display');
+    const vDisp = document.getElementById('vib-display');
+    if(tDisp) tDisp.innerText = tempVal.toFixed(1) + "°C";
+    if(vDisp) vDisp.innerText = vibVal.toFixed(2) + "G";
 
-    // AI Status & Threshold Logic
+    // AI & Threshold Logic
     const aiSug = document.getElementById('ai-suggestion');
     const aiAction = document.getElementById('ai-action-step');
     const health = document.getElementById('motor-health-score');
 
-    if (tempVal >= 70 || vibVal >= 3.0) {
-        aiSug.innerText = "CRITICAL: " + s.toUpperCase();
+    if (tempVal >= 70) {
+        aiSug.innerText = "CRITICAL: OVERHEATING";
         aiSug.style.color = "#ef4444";
-        aiAction.innerHTML = "⚠️ <b>HUMAN CHECK REQUIRED:</b> Burning smell or humming detected!";
-        health.innerText = "40%";
-        health.style.color = "#ef4444";
+        aiAction.innerHTML = "⚠️ <b>IMMEDIATE ACTION:</b> Shutdown PSC Motor and check for mechanical resistance.";
+        if(health) health.innerText = "20%";
         updateStatusLight('temp-light', '#ef4444');
-        updateStatusLight('vib-light', '#ef4444');
+    } else if (tempVal >= 66) {
+        aiSug.innerText = "WARNING: HIGH TEMP";
+        aiSug.style.color = "#fbbf24";
+        aiAction.innerText = "Observe motor load. Ensure proper ventilation.";
+        if(health) health.innerText = "75%";
+        updateStatusLight('temp-light', '#fbbf24');
     } else {
         aiSug.innerText = "SYSTEM NORMAL";
         aiSug.style.color = "#00ff88";
-        aiAction.innerText = "Monitoring PSC Motor health in real-time...";
-        health.innerText = "100%";
-        health.style.color = "#00ff88";
+        aiAction.innerText = "Endurance test in progress. Data logging stable.";
+        if(health) health.innerText = "100%";
         updateStatusLight('temp-light', '#00ff88');
-        updateStatusLight('vib-light', '#00ff88');
     }
 
     // Chart Update
@@ -105,6 +149,7 @@ function updateDashboard(t, v, s) {
     myChart.data.datasets[0].data.push(tempVal);
     myChart.data.datasets[1].data.push(vibVal);
     
+    // Maintain only last 20 readings for performance
     if (myChart.data.labels.length > 20) {
         myChart.data.labels.shift();
         myChart.data.datasets.forEach(d => d.data.shift());
@@ -116,27 +161,36 @@ function updateStatusLight(id, color) {
     const light = document.getElementById(id);
     if(light) {
         light.style.backgroundColor = color;
-        light.style.boxShadow = `0 0 10px ${color}`;
+        light.style.boxShadow = `0 0 15px ${color}`;
     }
 }
 
 function stopMonitoring() {
     clearInterval(fetchInterval);
-    document.getElementById('connect-btn').style.display = "inline-block";
-    document.getElementById('disconnect-btn').style.display = "none";
-    document.getElementById('sync-status').innerText = "Paused";
-    logEvent("STOPPED: Polling paused.");
+    const connBtn = document.getElementById('connect-btn');
+    const discBtn = document.getElementById('disconnect-btn');
+    const syncLabel = document.getElementById('sync-status');
+    
+    if(connBtn) connBtn.style.display = "inline-block";
+    if(discBtn) discBtn.style.display = "none";
+    if(syncLabel) syncLabel.innerText = "Paused";
+    
+    logEvent("STOPPED: Live sync paused.");
 }
 
 function logEvent(msg) {
     const list = document.getElementById('event-list');
     if(list) {
         const entry = document.createElement('li');
+        entry.style.borderLeft = "3px solid #3b82f6";
+        entry.style.marginBottom = "5px";
+        entry.style.paddingLeft = "8px";
         entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
         list.prepend(entry);
     }
 }
 
 function clearHistory() {
-    document.getElementById('event-list').innerHTML = "";
+    const list = document.getElementById('event-list');
+    if(list) list.innerHTML = "";
 }
