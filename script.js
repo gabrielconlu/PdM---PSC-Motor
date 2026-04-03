@@ -1,69 +1,110 @@
-const url = "https://script.google.com/macros/s/AKfycbwSOu_RIydveUUzbOvDLDuId2BG14_qzjqTXPnK7gSKmYsdSYkJulYUza0aMWmjA1M/exec"; 
+// Gamitin ang iyong bagong Deployment ID
+const url = "https://script.google.com/macros/s/AKfycbwpDizpqZzclgyQzu02s_yLXQM6fJDTHQG6w_g-AN8BNhIDbOQ8uE6mGk8POqWf19ul/exec"; 
 
 let myChart;
 let fetchInterval;
 
 window.onload = function() {
-    initChart(); // Tawagin ang function para i-setup ang chart
+    initChart(); 
 };
 
+// --- CHART INITIALIZATION ---
+function initChart() {
+    const ctx = document.getElementById('myChart').getContext('2d');
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', borderWidth: 2, pointRadius: 2, tension: 0.3, yAxisID: 'y' },
+                { label: 'Vibration (G)', data: [], borderColor: '#22c55e', borderWidth: 2, pointRadius: 2, tension: 0.3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { type: 'linear', display: true, position: 'left', ticks: { color: '#ef4444' } },
+                y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#22c55e' } }
+            }
+        }
+    });
+}
+
+// --- CLOUD SYNC LOGIC ---
 async function startMonitoring() {
     document.getElementById('connect-btn').style.display = "none";
     document.getElementById('disconnect-btn').style.display = "inline-block";
     
     logEvent("SYSTEM START: Fetching data from Google Sheets...");
-
-    // Simulan ang pagkuha ng data bawat 5 seconds
+    
+    // Unang kuha agad ng data
+    fetchDataFromSheets();
+    
+    // Polling every 5 seconds
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
 
 async function fetchDataFromSheets() {
     try {
-        document.getElementById('sync-status').innerText = "Fetching...";
-        
-        // Nagdadagdag tayo ng ?read=true para malaman ng Script na kailangan natin ng data
-        const response = await fetch(`${url}?read=true`);
+        const syncLabel = document.getElementById('sync-status');
+        syncLabel.innerText = "Fetching...";
+        syncLabel.style.color = "#8892b0";
+
+        // Request with cache-buster para laging fresh data
+        const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
-        if (data.temp) {
+        if (data.temp !== undefined) {
             updateDashboard(data.temp, data.vibration, data.status);
-            document.getElementById('sync-status').innerText = "Live";
-            document.getElementById('sync-status').style.color = "#00ff88";
+            syncLabel.innerText = "Live";
+            syncLabel.style.color = "#00ff88";
         }
     } catch (e) {
         console.error("Fetch Error:", e);
-        document.getElementById('sync-status').innerText = "Offline";
-        document.getElementById('sync-status').style.color = "#ff4444";
+        const syncLabel = document.getElementById('sync-status');
+        syncLabel.innerText = "Offline";
+        syncLabel.style.color = "#ef4444";
     }
 }
 
 function updateDashboard(t, v, s) {
-    // Update numerical displays
-    document.getElementById('temp-display').innerText = t.toFixed(1) + "°C";
-    document.getElementById('vib-display').innerText = v.toFixed(2) + "G";
+    const tempVal = parseFloat(t);
+    const vibVal = parseFloat(v);
 
-    // Threshold & AI Logic
+    // Update numerical displays
+    document.getElementById('temp-display').innerText = tempVal.toFixed(1) + "°C";
+    document.getElementById('vib-display').innerText = vibVal.toFixed(2) + "G";
+
+    // AI Status & Threshold Logic
     const aiSug = document.getElementById('ai-suggestion');
     const aiAction = document.getElementById('ai-action-step');
-    
-    if (t >= 70 || v >= 3.0) {
-        aiSug.innerText = "CRITICAL: " + s;
-        aiSug.style.color = "#ff4444";
-        aiAction.innerHTML = "⚠️ <b>HUMAN CHECK REQUIRED:</b> Check for burning smell or humming sounds!";
-        logEvent(`ALERT: High values detected (${t}°C, ${v}G)`);
+    const health = document.getElementById('motor-health-score');
+
+    if (tempVal >= 70 || vibVal >= 3.0) {
+        aiSug.innerText = "CRITICAL: " + s.toUpperCase();
+        aiSug.style.color = "#ef4444";
+        aiAction.innerHTML = "⚠️ <b>HUMAN CHECK REQUIRED:</b> Burning smell or humming detected!";
+        health.innerText = "40%";
+        health.style.color = "#ef4444";
+        updateStatusLight('temp-light', '#ef4444');
+        updateStatusLight('vib-light', '#ef4444');
     } else {
         aiSug.innerText = "SYSTEM NORMAL";
         aiSug.style.color = "#00ff88";
-        aiAction.innerText = "Continuous monitoring of PSC Motor...";
+        aiAction.innerText = "Monitoring PSC Motor health in real-time...";
+        health.innerText = "100%";
+        health.style.color = "#00ff88";
+        updateStatusLight('temp-light', '#00ff88');
+        updateStatusLight('vib-light', '#00ff88');
     }
 
     // Chart Update
     const now = new Date().toLocaleTimeString([], { hour12: false });
     myChart.data.labels.push(now);
-    myChart.data.datasets[0].data.push(t);
-    myChart.data.datasets[1].data.push(v);
+    myChart.data.datasets[0].data.push(tempVal);
+    myChart.data.datasets[1].data.push(vibVal);
     
-    // Limit points sa chart para hindi bumagal (Last 20 points)
     if (myChart.data.labels.length > 20) {
         myChart.data.labels.shift();
         myChart.data.datasets.forEach(d => d.data.shift());
@@ -71,11 +112,31 @@ function updateDashboard(t, v, s) {
     myChart.update('none');
 }
 
+function updateStatusLight(id, color) {
+    const light = document.getElementById(id);
+    if(light) {
+        light.style.backgroundColor = color;
+        light.style.boxShadow = `0 0 10px ${color}`;
+    }
+}
+
 function stopMonitoring() {
     clearInterval(fetchInterval);
     document.getElementById('connect-btn').style.display = "inline-block";
     document.getElementById('disconnect-btn').style.display = "none";
+    document.getElementById('sync-status').innerText = "Paused";
     logEvent("STOPPED: Polling paused.");
 }
 
-// ... (Panatilihin ang initChart, logEvent, at clearHistory functions)
+function logEvent(msg) {
+    const list = document.getElementById('event-list');
+    if(list) {
+        const entry = document.createElement('li');
+        entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        list.prepend(entry);
+    }
+}
+
+function clearHistory() {
+    document.getElementById('event-list').innerHTML = "";
+}
