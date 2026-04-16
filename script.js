@@ -84,25 +84,21 @@ async function fetchDataFromSheets() {
         const data = await response.json();
 
         if (data.temp !== undefined && data.timestamp) {
-            // --- REAL-TIME VALIDATION LOGIC ---
             const dataTime = new Date(data.timestamp).getTime(); 
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // Kung ang data ay mas matanda sa 60 seconds (1 minute)
             if (diffInSeconds > 60) {
                 if(syncLabel) {
                     syncLabel.innerText = "Waiting for Data...";
-                    syncLabel.style.color = "#fbbf24"; // Yellow alert
+                    syncLabel.style.color = "#fbbf24";
                 }
-                // Hindi tayo mag-u-update ng chart para hindi "manloko" ang live graph
-                updateStatusLight('temp-light', '#334155'); // Grayed out
+                updateStatusLight('temp-light', '#334155'); 
             } else {
-                // FRESH DATA: Within last 60 seconds
                 updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
                 if(syncLabel) {
                     syncLabel.innerText = "Live";
-                    syncLabel.style.color = "#00ff88"; // Green
+                    syncLabel.style.color = "#00ff88"; 
                 }
             }
         }
@@ -129,27 +125,44 @@ function updateDashboard(t, v, s) {
     const aiAction = document.getElementById('ai-action-step');
     const health = document.getElementById('motor-health-score');
 
-    if (tempVal >= 70) {
-        aiSug.innerText = "CRITICAL: OVERHEATING";
-        aiSug.style.color = "#ef4444";
-        aiAction.innerHTML = "⚠️ <b>IMMEDIATE ACTION:</b> Shutdown PSC Motor.";
-        if(health) health.innerText = "20%";
+    let currentStatus = "SYSTEM NORMAL";
+    let statusColor = "#00ff88";
+    let healthScore = 100;
+    let actionText = "Endurance test stable. Monitoring sensors...";
+
+    // --- REVISED TEMPERATURE LOGIC (75°C & 85°C) ---
+    if (tempVal >= 85) {
+        currentStatus = "CRITICAL: OVERHEATING";
+        statusColor = "#ef4444";
+        actionText = "🔴 <b>STOP:</b> Immediately turn off and check inside parts!";
+        healthScore = 10;
         updateStatusLight('temp-light', '#ef4444');
-    } else if (tempVal >= 66) {
-        aiSug.innerText = "WARNING: HIGH TEMP";
-        aiSug.style.color = "#fbbf24";
-        aiAction.innerText = "Observe motor load. High heat detected.";
-        if(health) health.innerText = "75%";
+    } else if (tempVal >= 75) {
+        currentStatus = "WARNING: EXCESSIVE HEAT";
+        statusColor = "#fbbf24";
+        actionText = "⚠️ Check proper ventilation. Monitor load closely.";
+        healthScore = 50;
         updateStatusLight('temp-light', '#fbbf24');
     } else {
-        aiSug.innerText = "SYSTEM NORMAL";
-        aiSug.style.color = "#00ff88";
-        aiAction.innerText = "Endurance test stable.";
-        if(health) health.innerText = "100%";
         updateStatusLight('temp-light', '#00ff88');
     }
 
-    // Chart Update: Gagamit ng oras ng Spreadsheet imbes na local time
+    // --- REVISED VIBRATION LOGIC (3G Threshold) ---
+    if (vibVal >= 3.0) {
+        currentStatus = (tempVal >= 75) ? "MULTIPLE FAILURES DETECTED" : "ABNORMAL VIBRATION";
+        statusColor = "#ef4444";
+        // Dinadagdagan ang action text kung may vibration issue
+        actionText += "<br>⚙️ <b>VIBRATION ALERT:</b> Check for shaft/bearing blockages.";
+        healthScore = Math.min(healthScore, 40); 
+    }
+
+    // Update UI Elements
+    aiSug.innerText = currentStatus;
+    aiSug.style.color = statusColor;
+    aiAction.innerHTML = actionText;
+    if(health) health.innerText = healthScore + "%";
+
+    // Chart Update
     const now = new Date().toLocaleTimeString([], { hour12: false });
     myChart.data.labels.push(now);
     myChart.data.datasets[0].data.push(tempVal);
