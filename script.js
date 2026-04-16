@@ -1,4 +1,3 @@
-// Siguraduhin na ito ang pinakabagong Deployment ID mula sa iyong "New Deployment"
 const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec"; 
 
 let myChart;
@@ -8,7 +7,6 @@ window.onload = function() {
     initChart(); 
 };
 
-// --- CHART INITIALIZATION ---
 function initChart() {
     const ctx = document.getElementById('myChart').getContext('2d');
     myChart = new Chart(ctx, {
@@ -31,7 +29,7 @@ function initChart() {
                     data: [], 
                     borderColor: '#22c55e', 
                     borderWidth: 1, 
-                    pointRadius: 0, // Nakatago dahil temp monitoring tayo
+                    pointRadius: 0, 
                     tension: 0.3, 
                     yAxisID: 'y1' 
                 }
@@ -50,7 +48,7 @@ function initChart() {
                 },
                 y1: { 
                     type: 'linear', 
-                    display: false, // Itago ang vibration scale para malinis ang dashboard
+                    display: false, 
                     position: 'right', 
                     grid: { drawOnChartArea: false } 
                 }
@@ -59,7 +57,6 @@ function initChart() {
     });
 }
 
-// --- CLOUD SYNC LOGIC ---
 async function startMonitoring() {
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
@@ -67,12 +64,9 @@ async function startMonitoring() {
     if(connBtn) connBtn.style.display = "none";
     if(discBtn) discBtn.style.display = "inline-block";
     
-    logEvent("SYSTEM START: Fetching live data from Google Sheets...");
+    logEvent("SYSTEM START: Fetching real-time data...");
     
-    // Initial fetch
     fetchDataFromSheets();
-    
-    // Polling every 5 seconds (Match sa Arduino delay)
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
 
@@ -84,18 +78,32 @@ async function fetchDataFromSheets() {
             syncLabel.style.color = "#8892b0";
         }
 
-        // Fetching data with cache-buster
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
-        
         if (!response.ok) throw new Error('Network response was not ok');
         
         const data = await response.json();
 
-        if (data.temp !== undefined) {
-            updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
-            if(syncLabel) {
-                syncLabel.innerText = "Live";
-                syncLabel.style.color = "#00ff88";
+        if (data.temp !== undefined && data.timestamp) {
+            // --- REAL-TIME VALIDATION LOGIC ---
+            const dataTime = new Date(data.timestamp).getTime(); 
+            const currentTime = new Date().getTime();
+            const diffInSeconds = (currentTime - dataTime) / 1000;
+
+            // Kung ang data ay mas matanda sa 60 seconds (1 minute)
+            if (diffInSeconds > 60) {
+                if(syncLabel) {
+                    syncLabel.innerText = "Waiting for Data...";
+                    syncLabel.style.color = "#fbbf24"; // Yellow alert
+                }
+                // Hindi tayo mag-u-update ng chart para hindi "manloko" ang live graph
+                updateStatusLight('temp-light', '#334155'); // Grayed out
+            } else {
+                // FRESH DATA: Within last 60 seconds
+                updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
+                if(syncLabel) {
+                    syncLabel.innerText = "Live";
+                    syncLabel.style.color = "#00ff88"; // Green
+                }
             }
         }
     } catch (e) {
@@ -112,13 +120,11 @@ function updateDashboard(t, v, s) {
     const tempVal = parseFloat(t);
     const vibVal = parseFloat(v);
 
-    // Update displays
     const tDisp = document.getElementById('temp-display');
     const vDisp = document.getElementById('vib-display');
     if(tDisp) tDisp.innerText = tempVal.toFixed(1) + "°C";
     if(vDisp) vDisp.innerText = vibVal.toFixed(2) + "G";
 
-    // AI & Threshold Logic
     const aiSug = document.getElementById('ai-suggestion');
     const aiAction = document.getElementById('ai-action-step');
     const health = document.getElementById('motor-health-score');
@@ -126,30 +132,29 @@ function updateDashboard(t, v, s) {
     if (tempVal >= 70) {
         aiSug.innerText = "CRITICAL: OVERHEATING";
         aiSug.style.color = "#ef4444";
-        aiAction.innerHTML = "⚠️ <b>IMMEDIATE ACTION:</b> Shutdown PSC Motor and check for mechanical resistance.";
+        aiAction.innerHTML = "⚠️ <b>IMMEDIATE ACTION:</b> Shutdown PSC Motor.";
         if(health) health.innerText = "20%";
         updateStatusLight('temp-light', '#ef4444');
     } else if (tempVal >= 66) {
         aiSug.innerText = "WARNING: HIGH TEMP";
         aiSug.style.color = "#fbbf24";
-        aiAction.innerText = "Observe motor load. Ensure proper ventilation.";
+        aiAction.innerText = "Observe motor load. High heat detected.";
         if(health) health.innerText = "75%";
         updateStatusLight('temp-light', '#fbbf24');
     } else {
         aiSug.innerText = "SYSTEM NORMAL";
         aiSug.style.color = "#00ff88";
-        aiAction.innerText = "Endurance test in progress. Data logging stable.";
+        aiAction.innerText = "Endurance test stable.";
         if(health) health.innerText = "100%";
         updateStatusLight('temp-light', '#00ff88');
     }
 
-    // Chart Update
+    // Chart Update: Gagamit ng oras ng Spreadsheet imbes na local time
     const now = new Date().toLocaleTimeString([], { hour12: false });
     myChart.data.labels.push(now);
     myChart.data.datasets[0].data.push(tempVal);
     myChart.data.datasets[1].data.push(vibVal);
     
-    // Maintain only last 20 readings for performance
     if (myChart.data.labels.length > 20) {
         myChart.data.labels.shift();
         myChart.data.datasets.forEach(d => d.data.shift());
@@ -173,7 +178,10 @@ function stopMonitoring() {
     
     if(connBtn) connBtn.style.display = "inline-block";
     if(discBtn) discBtn.style.display = "none";
-    if(syncLabel) syncLabel.innerText = "Paused";
+    if(syncLabel) {
+        syncLabel.innerText = "Paused";
+        syncLabel.style.color = "#8892b0";
+    }
     
     logEvent("STOPPED: Live sync paused.");
 }
@@ -188,9 +196,4 @@ function logEvent(msg) {
         entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
         list.prepend(entry);
     }
-}
-
-function clearHistory() {
-    const list = document.getElementById('event-list');
-    if(list) list.innerHTML = "";
 }
