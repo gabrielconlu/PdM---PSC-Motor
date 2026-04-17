@@ -3,47 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSC Motor Health | Cloud Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>PSC Motor Health Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-
-    <div class="header">
-        <h1>PSC Motor Health AI Monitoring</h1>
-        <p style="font-size: 0.8rem; opacity: 0.8;">IoT Cloud Research Edition</p>
-    </div> 
-
     <div class="container">
-        <div class="ai-box" id="ai-status-box">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <strong id="ai-suggestion" style="font-size: 1.2rem;">SYSTEM READY</strong>
-                    <p id="ai-action-step" class="ai-subtext">Waiting for Cloud Sync...</p>
-                </div>
-                <div style="text-align: right;">
-                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
-                </div>
-            </div>
-
-            <div class="stats-row">
-                <span>Cloud Status: <b id="sync-status" style="color: #888;">Idle</b></span>
-                <span>Motor Health: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
-            </div>
+        <div class="header">
+            <h2>PSC MOTOR MONITORING</h2>
+            <div id="sync-status">Offline</div>
         </div>
 
         <div class="metrics-grid">
             <div class="card">
-                <div class="status-light" id="temp-light"></div>
-                <div class="label">Motor Temperature</div>
-                <div class="value" id="temp-display">0.0°C</div>
+                <div id="temp-light" class="status-light"></div>
+                <div class="label">Temperature</div>
+                <div class="value"><span id="temp-display">0.0</span><span class="unit">°C</span></div>
             </div>
-
             <div class="card">
-                <div class="status-light" id="vib-light"></div>
-                <div class="label">Vibration Intensity</div>
-                <div class="value" id="vib-display">0.00G</div>
+                <div id="vib-light" class="status-light"></div>
+                <div class="label">Vibration (G)</div>
+                <div class="value"><span id="vib-display">0.96</span><span class="unit">G</span></div>
+            </div>
+        </div>
+
+        <div class="ai-box">
+            <div id="status-label" style="font-weight: bold; font-size: 1.1rem;">WAITING FOR DATA</div>
+            <div class="ai-subtext" id="ai-action-step">Connect to start real-time monitoring of the PSC Motor.</div>
+            <div class="stats-row">
+                <span>Health Score: <b id="motor-health-score">--</b></span>
             </div>
         </div>
 
@@ -51,15 +39,14 @@
             <canvas id="myChart"></canvas>
         </div>
 
-        <div class="log-box">
-            <div class="log-header">
-                <strong>SYSTEM LOGS</strong>
-                <button class="clear-btn" onclick="clearHistory()" style="font-size: 0.7rem;">Clear</button>
+        <div class="log-box" id="system-logs">
             </div>
-            <ul id="event-list"></ul>
+
+        <div class="nav-row">
+            <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">CONNECT</button>
+            <button id="disconnect-btn" class="btn-connect" style="display:none; background: #475569;" onclick="stopMonitoring()">DISCONNECT</button>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
