@@ -3,60 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSC Motor Health | Cloud Monitor</title>
+    <title>PSC Motor Health AI Monitoring</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* HEADER LAYOUT */
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 35px; /* Space between the 3D Cube and your Title */
+            padding: 40px 0;
+            border-bottom: 1px solid #222;
+        }
+
+        /* 3D WIREFRAME CUBE */
+        .cube-viewport {
+            width: 80px;
+            height: 80px;
+            perspective: 500px;
+        }
+
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(-20deg) rotateY(25deg);
+        }
+
+        /* Pure CSS Wireframe Faces */
+        .cube-face {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 1.5px solid #39ff14; /* Neon Green Wireframe */
+            background: rgba(57, 255, 20, 0.05);
+            box-shadow: inset 0 0 10px rgba(57, 255, 20, 0.1);
+        }
+
+        /* 3D Positioning */
+        .front  { transform: translateZ(40px); }
+        .back   { transform: rotateY(180deg) translateZ(40px); }
+        .left   { transform: rotateY(-90deg) translateZ(40px); }
+        .right  { transform: rotateY(90deg) translateZ(40px); }
+        .top    { transform: rotateX(90deg) translateZ(40px); }
+        .bottom { transform: rotateX(-90deg) translateZ(40px); }
+
+        /* Animation Classes for script.js to trigger */
+        .cube-rotating {
+            animation: rotateCube 10s infinite linear;
+        }
+
+        .cube-vibrate {
+            animation: rotateCube 2s infinite linear, shakeCube 0.1s infinite linear !important;
+            border-color: #ff3131 !important; /* Turns red during high vibration */
+        }
+
+        @keyframes rotateCube {
+            from { transform: rotateX(0deg) rotateY(0deg); }
+            to { transform: rotateX(360deg) rotateY(360deg); }
+        }
+
+        @keyframes shakeCube {
+            0% { transform: translate(1px, 1px); }
+            50% { transform: translate(-2px, -2px); }
+            100% { transform: translate(1px, 1px); }
+        }
+
+        /* Title Styling */
+        .header-text h1 {
+            margin: 0;
+            font-size: 2rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .header-text p {
+            font-size: 0.75rem;
+            opacity: 0.6;
+            margin: 5px 0 0 0;
+            letter-spacing: 2px;
+        }
+    </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>PSC Motor Health AI Monitoring</h1>
-        <p style="font-size: 0.8rem; opacity: 0.8;">IoT Cloud Research Edition</p>
-    </div> 
+    <div class="header-container">
+        <div class="cube-viewport">
+            <div id="motor-cube" class="cube">
+                <div class="cube-face front"></div>
+                <div class="cube-face back"></div>
+                <div class="cube-face left"></div>
+                <div class="cube-face right"></div>
+                <div class="cube-face top"></div>
+                <div class="cube-face bottom"></div>
+            </div>
+        </div>
+        <div class="header-text">
+            <h1>PSC Motor Health AI Monitoring</h1>
+            <p>IoT CLOUD RESEARCH EDITION</p>
+        </div>
+    </div>
 
     <div class="container">
-        <div class="ai-box" id="ai-status-box">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="ai-box">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <strong id="ai-suggestion" style="font-size: 1.2rem;">SYSTEM READY</strong>
-                    <p id="ai-action-step" class="ai-subtext">Waiting for Cloud Sync...</p>
+                    <p id="ai-action-step" class="ai-subtext">Waiting for Live Sync...</p>
                 </div>
-                <div style="text-align: right;">
-                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
+                <div style="display: flex; gap: 10px;">
+                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START SYNC</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444; color:white; border:none;">PAUSE</button>
                 </div>
-            </div>
-
-            <div class="stats-row">
-                <span>Cloud Status: <b id="sync-status" style="color: #888;">Idle</b></span>
-                <span>Motor Health: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
             </div>
         </div>
 
         <div class="metrics-grid">
             <div class="card">
                 <div class="status-light" id="temp-light"></div>
-                <div class="label">Motor Temperature</div>
+                <div class="label">Temperature</div>
                 <div class="value" id="temp-display">0.0°C</div>
             </div>
-
             <div class="card">
                 <div class="status-light" id="vib-light"></div>
-                <div class="label">Vibration Intensity</div>
+                <div class="label">Vibration (G)</div>
                 <div class="value" id="vib-display">0.00G</div>
             </div>
         </div>
 
         <div class="chart-box">
             <canvas id="myChart"></canvas>
-        </div>
-
-        <div class="log-box">
-            <div class="log-header">
-                <strong>SYSTEM LOGS</strong>
-                <button class="clear-btn" onclick="clearHistory()" style="font-size: 0.7rem;">Clear</button>
-            </div>
-            <ul id="event-list"></ul>
         </div>
     </div>
 
