@@ -60,15 +60,11 @@ function initChart() {
 async function startMonitoring() {
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
-    const motorImg = document.getElementById('motor-visual'); // Kukunin ang image element
     
     if(connBtn) connBtn.style.display = "none";
     if(discBtn) discBtn.style.display = "inline-block";
     
-    // START ANIMATION: Magsisimulang umikot ang rod
-    if(motorImg) motorImg.classList.add('sync-active');
-    
-    logEvent("SYSTEM START: Live sync active. Motor rod rotating...");
+    logEvent("SYSTEM START: Fetching real-time data...");
     
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
@@ -94,7 +90,7 @@ async function fetchDataFromSheets() {
 
             if (diffInSeconds > 60) {
                 if(syncLabel) {
-                    syncLabel.innerText = "Waiting for New Data...";
+                    syncLabel.innerText = "Waiting for Data...";
                     syncLabel.style.color = "#fbbf24";
                 }
                 updateStatusLight('temp-light', '#334155'); 
@@ -119,7 +115,6 @@ async function fetchDataFromSheets() {
 function updateDashboard(t, v, s) {
     const tempVal = parseFloat(t);
     const vibVal = parseFloat(v);
-    const motorImg = document.getElementById('motor-visual');
 
     const tDisp = document.getElementById('temp-display');
     const vDisp = document.getElementById('vib-display');
@@ -135,35 +130,30 @@ function updateDashboard(t, v, s) {
     let healthScore = 100;
     let actionText = "Endurance test stable. Monitoring sensors...";
 
-    // --- THERMAL LOGIC (Base on Class B & Research) ---
+    // --- REVISED TEMPERATURE LOGIC (75°C & 85°C) ---
     if (tempVal >= 85) {
         currentStatus = "CRITICAL: OVERHEATING";
         statusColor = "#ef4444";
-        actionText = "🔴 <b>STOP:</b> Possible burning smell. Shutdown motor immediately!";
+        actionText = "🔴 <b>STOP:</b> Immediately turn off and check inside parts!";
         healthScore = 10;
         updateStatusLight('temp-light', '#ef4444');
     } else if (tempVal >= 75) {
         currentStatus = "WARNING: EXCESSIVE HEAT";
         statusColor = "#fbbf24";
-        actionText = "⚠️ Check proper ventilation. Manpower inspection needed.";
-        healthScore = 55;
+        actionText = "⚠️ Check proper ventilation. Monitor load closely.";
+        healthScore = 50;
         updateStatusLight('temp-light', '#fbbf24');
     } else {
         updateStatusLight('temp-light', '#00ff88');
     }
 
-    // --- VIBRATION LOGIC & ANIMATION REACTION ---
+    // --- REVISED VIBRATION LOGIC (3G Threshold) ---
     if (vibVal >= 3.0) {
-        currentStatus = (tempVal >= 75) ? "CRITICAL: MULTIPLE ANOMALIES" : "ABNORMAL VIBRATION";
+        currentStatus = (tempVal >= 75) ? "MULTIPLE FAILURES DETECTED" : "ABNORMAL VIBRATION";
         statusColor = "#ef4444";
+        // Dinadagdagan ang action text kung may vibration issue
         actionText += "<br>⚙️ <b>VIBRATION ALERT:</b> Check for shaft/bearing blockages.";
         healthScore = Math.min(healthScore, 40); 
-        
-        // Gagawa ng "Shake" effect sa motor design
-        if(motorImg) motorImg.classList.add('vibration-alert');
-    } else {
-        // Balik sa normal na ikot lang
-        if(motorImg) motorImg.classList.remove('vibration-alert');
     }
 
     // Update UI Elements
@@ -198,19 +188,12 @@ function stopMonitoring() {
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
     const syncLabel = document.getElementById('sync-status');
-    const motorImg = document.getElementById('motor-visual');
     
     if(connBtn) connBtn.style.display = "inline-block";
     if(discBtn) discBtn.style.display = "none";
     if(syncLabel) {
         syncLabel.innerText = "Paused";
         syncLabel.style.color = "#8892b0";
-    }
-
-    // STOP ANIMATION: Hihinto ang ikot ng rod
-    if(motorImg) {
-        motorImg.classList.remove('sync-active');
-        motorImg.classList.remove('vibration-alert');
     }
     
     logEvent("STOPPED: Live sync paused.");
@@ -226,9 +209,4 @@ function logEvent(msg) {
         entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
         list.prepend(entry);
     }
-}
-
-function clearHistory() {
-    const list = document.getElementById('event-list');
-    if(list) list.innerHTML = "";
 }
