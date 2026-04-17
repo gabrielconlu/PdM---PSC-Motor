@@ -23,7 +23,7 @@
                 </div>
                 <div style="text-align: right;">
                     <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444; color:white; border:none;">PAUSE SYNC</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
                 </div>
             </div>
 
@@ -31,11 +31,6 @@
                 <span>Cloud Status: <b id="sync-status" style="color: #888;">Idle</b></span>
                 <span>Motor Health: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
             </div>
-        </div>
-
-        <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; overflow: hidden;">
-            <span class="label" style="margin-bottom: 15px;">Live Motor Dynamics</span>
-            <img id="motor-visual" src="psc-motor.png" alt="Motor Visual" style="width: 250px; transition: all 0.3s ease;">
         </div>
 
         <div class="metrics-grid">
