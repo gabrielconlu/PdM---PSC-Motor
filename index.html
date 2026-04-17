@@ -6,107 +6,12 @@
     <title>PSC Motor Health | Cloud Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
-    
-    <style>
-        /* CSS para sa 3D Cube Layout */
-        .header-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 50px;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 15px;
-        }
-
-        /* Cube Container & Perspective */
-        .cube-viewport {
-            width: 120px;
-            height: 120px;
-            perspective: 600px;
-        }
-
-        .cube {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transform-style: preserve-3d;
-            transform: rotateX(-20deg) rotateY(20deg);
-        }
-
-        /* Rotation Animation - Triggered by JS class */
-        @keyframes rotateCube {
-            from { transform: rotateX(0deg) rotateY(0deg); }
-            to { transform: rotateX(360deg) rotateY(360deg); }
-        }
-
-        .cube-rotating {
-            animation: rotateCube 10s infinite linear;
-        }
-
-        /* Vibration Animation */
-        @keyframes cubeShake {
-            0% { transform: translate(1px, 1px) rotateX(-20deg); }
-            50% { transform: translate(-2px, -3px) rotateX(-25deg); }
-            100% { transform: translate(1px, 1px) rotateX(-20deg); }
-        }
-
-        .cube-vibrate {
-            animation: rotateCube 3s infinite linear, cubeShake 0.1s infinite linear !important;
-            filter: drop-shadow(0 0 15px #ef4444) !important;
-        }
-
-        .cube-face {
-            position: absolute;
-            width: 120px;
-            height: 120px;
-            border: 1px solid rgba(57, 255, 20, 0.3);
-            background-color: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        /* Nilalagay ang image sa bawat side ng cube */
-        .cube-face img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.8;
-        }
-
-        /* 3D Positioning */
-        .front  { transform: translateZ(60px); }
-        .back   { transform: rotateY(180deg) translateZ(60px); }
-        .left   { transform: rotateY(-90deg) translateZ(60px); }
-        .right  { transform: rotateY(90deg) translateZ(60px); }
-        .top    { transform: rotateX(90deg) translateZ(60px); }
-        .bottom { transform: rotateX(-90deg) translateZ(60px); }
-
-        .header-text h1 { margin: 0; letter-spacing: 2px; }
-        .header-text p { margin: 5px 0 0 0; opacity: 0.7; }
-    </style>
 </head>
 <body>
 
-    <div class="header-container">
-        <div class="cube-viewport">
-            <div id="motor-cube" class="cube">
-                <div class="cube-face front"><img src="image_3a9c02.png"></div>
-                <div class="cube-face back"><img src="image_3a9c02.png"></div>
-                <div class="cube-face left"><img src="image_3a9c02.png"></div>
-                <div class="cube-face right"><img src="image_3a9c02.png"></div>
-                <div class="cube-face top"><img src="image_3a9c02.png"></div>
-                <div class="cube-face bottom"><img src="image_3a9c02.png"></div>
-            </div>
-        </div>
-        
-        <div class="header-text">
-            <h1>PSC Motor Health AI Monitoring</h1>
-            <p>IoT Cloud Research Edition | Room 01 System</p>
-        </div>
+    <div class="header">
+        <h1>PSC Motor Health AI Monitoring</h1>
+        <p style="font-size: 0.8rem; opacity: 0.8;">IoT Cloud Research Edition</p>
     </div> 
 
     <div class="container">
@@ -117,8 +22,8 @@
                     <p id="ai-action-step" class="ai-subtext">Waiting for Cloud Sync...</p>
                 </div>
                 <div style="text-align: right;">
-                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()" style="display:none;">START LIVE SYNC</button>
-                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444; color:white; border:none;">PAUSE SYNC</button>
+                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
                 </div>
             </div>
 
@@ -128,11 +33,30 @@
             </div>
         </div>
 
-        <div class="card" style="margin-top:20px; background:#0a0a0a; border:1px solid #222;">
-            <span class="label">System Activity Logs</span>
-            <div id="system-logs" style="height:100px; overflow-y:auto; font-family:monospace; font-size:0.8rem; color:#aaa;">
-                <div class="log-entry">Waiting for JavaScript initialization...</div>
+        <div class="metrics-grid">
+            <div class="card">
+                <div class="status-light" id="temp-light"></div>
+                <div class="label">Motor Temperature</div>
+                <div class="value" id="temp-display">0.0°C</div>
             </div>
+
+            <div class="card">
+                <div class="status-light" id="vib-light"></div>
+                <div class="label">Vibration Intensity</div>
+                <div class="value" id="vib-display">0.00G</div>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <canvas id="myChart"></canvas>
+        </div>
+
+        <div class="log-box">
+            <div class="log-header">
+                <strong>SYSTEM LOGS</strong>
+                <button class="clear-btn" onclick="clearHistory()" style="font-size: 0.7rem;">Clear</button>
+            </div>
+            <ul id="event-list"></ul>
         </div>
     </div>
 
