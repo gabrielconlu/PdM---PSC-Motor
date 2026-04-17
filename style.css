@@ -1,152 +1,65 @@
-:root {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent-blue: #3b82f6;
-    --accent-green: #22c55e;
-    --accent-red: #ef4444;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSC Motor Health | Cloud Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-primary);
-    margin: 0;
-    padding: 20px;
-}
+    <div class="header">
+        <h1>PSC Motor Health AI Monitoring</h1>
+        <p style="font-size: 0.8rem; opacity: 0.8;">IoT Cloud Research Edition</p>
+    </div> 
 
-.header {
-    text-align: center;
-    margin-bottom: 30px;
-}
+    <div class="container">
+        <div class="ai-box" id="ai-status-box">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <strong id="ai-suggestion" style="font-size: 1.2rem;">SYSTEM READY</strong>
+                    <p id="ai-action-step" class="ai-subtext">Waiting for Cloud Sync...</p>
+                </div>
+                <div style="text-align: right;">
+                    <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">START LIVE SYNC</button>
+                    <button id="disconnect-btn" class="clear-btn" onclick="stopMonitoring()" style="display:none; background:#ef4444;">PAUSE SYNC</button>
+                </div>
+            </div>
 
-.container {
-    max-width: 900px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
+            <div class="stats-row">
+                <span>Cloud Status: <b id="sync-status" style="color: #888;">Idle</b></span>
+                <span>Motor Health: <b id="motor-health-score" style="color: #00ff88;">100%</b></span>
+            </div>
+        </div>
 
-/* AI Box Style */
-.ai-box {
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 12px;
-    border-left: 5px solid var(--accent-blue);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-}
+        <div class="metrics-grid">
+            <div class="card">
+                <div class="status-light" id="temp-light"></div>
+                <div class="label">Motor Temperature</div>
+                <div class="value" id="temp-display">0.0°C</div>
+            </div>
 
-.ai-subtext {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin: 5px 0 0 0;
-}
+            <div class="card">
+                <div class="status-light" id="vib-light"></div>
+                <div class="label">Vibration Intensity</div>
+                <div class="value" id="vib-display">0.00G</div>
+            </div>
+        </div>
 
-.stats-row {
-    margin-top: 15px;
-    font-size: 0.85rem;
-    display: flex;
-    gap: 25px;
-}
+        <div class="chart-box">
+            <canvas id="myChart"></canvas>
+        </div>
 
-/* Metrics Grid */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
+        <div class="log-box">
+            <div class="log-header">
+                <strong>SYSTEM LOGS</strong>
+                <button class="clear-btn" onclick="clearHistory()" style="font-size: 0.7rem;">Clear</button>
+            </div>
+            <ul id="event-list"></ul>
+        </div>
+    </div>
 
-.card {
-    background: var(--card-bg);
-    padding: 25px;
-    border-radius: 12px;
-    position: relative;
-    text-align: center;
-}
-
-.status-light {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: gray;
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.5);
-}
-
-.label {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.value {
-    font-size: 2.5rem;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-/* Chart & Logs */
-.chart-box {
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 12px;
-    height: 350px;
-}
-
-.log-box {
-    background: #020617;
-    border-radius: 12px;
-    padding: 15px;
-    font-family: 'Courier New', Courier, monospace;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.log-header {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid #1e293b;
-    padding-bottom: 8px;
-    margin-bottom: 10px;
-    font-size: 0.8rem;
-}
-
-#event-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    font-size: 0.75rem;
-    color: #00ff88;
-}
-
-#event-list li {
-    margin-bottom: 5px;
-    border-bottom: 1px solid #1e293b33;
-}
-
-/* Buttons */
-.btn-connect {
-    background: var(--accent-blue);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.clear-btn {
-    background: transparent;
-    border: 1px solid var(--text-secondary);
-    color: var(--text-secondary);
-    padding: 5px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-connect:hover { background: #2563eb; }
+    <script src="script.js"></script>
+</body>
+</html>
