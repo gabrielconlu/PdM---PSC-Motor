@@ -62,6 +62,19 @@ function calculateSlope(data) {
     return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
 }
 
+// --- DATE PARSING HELPER (Fixes Offline Issue) ---
+function parseSheetDate(dateStr) {
+    let d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+        // Manual parse para sa MM/DD/YYYY formats mula sa Sheets
+        let parts = dateStr.split(/[\s,/-]+/);
+        if (parts.length >= 3) {
+            d = new Date(parts[2], parts[0] - 1, parts[1], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+        }
+    }
+    return d;
+}
+
 async function startMonitoring() {
     isMonitoring = true;
     const connBtn = document.getElementById('connect-btn');
@@ -85,14 +98,17 @@ async function fetchDataFromSheets() {
         const data = await response.json();
 
         if (data.timestamp) {
-            const dataTime = new Date(data.timestamp).getTime(); 
+            const dataTime = parseSheetDate(data.timestamp).getTime(); 
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // Freshness Check: 120 seconds para iwas false "Offline"
-            if (diffInSeconds > 120) {
+            // Debugging info sa Browser Console (F12)
+            console.log(`Gap: ${diffInSeconds}s | Sheet: ${data.timestamp}`);
+
+            // Tolerance increased to 300s (5 minutes) para iwas false "Offline"
+            if (isNaN(dataTime) || diffInSeconds > 300) {
                 if(syncLabel) {
-                    syncLabel.innerText = "Data Stale";
+                    syncLabel.innerText = "Data Stale/Offline";
                     syncLabel.style.color = "#fbbf24"; 
                 }
                 updateDashboard(0, 0, "OFFLINE");
@@ -106,6 +122,7 @@ async function fetchDataFromSheets() {
             }
         }
     } catch (e) {
+        console.error("Fetch error:", e);
         logEvent("ERROR: Sync failed", "error");
         const syncLabel = document.getElementById('sync-status');
         if(syncLabel) syncLabel.innerText = "Offline";
@@ -126,7 +143,8 @@ function updateDashboard(t, v, s) {
     if(tDisp) tDisp.innerText = tempVal.toFixed(1);
     if(vDisp) vDisp.innerText = vibVal.toFixed(2);
 
-    if (isMonitoring && s !== "OFFLINE") {
+    // I-update lang ang chart kung hindi zero/offline ang data
+    if (isMonitoring && s !== "OFFLINE" && (tempVal !== 0 || vibVal !== 0)) {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(now);
         myChart.data.datasets[0].data.push(tempVal);
@@ -138,7 +156,7 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // --- REGRESSION ANALYSIS ---
+    // --- REGRESSION ANALYSIS (Last 10 points) ---
     const last10Temp = myChart.data.datasets[0].data.slice(-10);
     const last10Vib = myChart.data.datasets[1].data.slice(-10);
     const tempSlope = calculateSlope(last10Temp);
@@ -155,7 +173,6 @@ function updateDashboard(t, v, s) {
         healthAssessment = "OFFLINE";
         actionText = "Dashboard paused. Connect to resume data feed.";
     } 
-    // Regression Alert para sa mabilis na pag-init
     else if (tempVal >= 85 && tempSlope > 0.5) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
@@ -175,7 +192,7 @@ function updateDashboard(t, v, s) {
         actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment.`;
     }
 
-    // UI Apply
+    // --- UI UPDATES ---
     if(statLabel) {
         statLabel.innerText = currentStatus;
         statLabel.className = "status-text " + statusClass;
