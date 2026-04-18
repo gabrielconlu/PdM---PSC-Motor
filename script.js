@@ -70,7 +70,6 @@ async function fetchDataFromSheets() {
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
-        // Check if data is fresh (within 60 seconds)
         if (data.timestamp) {
             const dataTime = new Date(data.timestamp).getTime(); 
             const currentTime = new Date().getTime();
@@ -81,12 +80,10 @@ async function fetchDataFromSheets() {
                     syncLabel.innerText = "No Recent Data";
                     syncLabel.style.color = "#fbbf24"; 
                 }
-                // RESET TO ZERO if no recent data is sent from ESP32
                 updateDashboard(0, 0, "OFFLINE");
                 return; 
             }
 
-            // Fresh data found
             updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
             
             if(syncLabel) {
@@ -121,52 +118,40 @@ function updateDashboard(t, v, s) {
 
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
+    let healthAssessment = "OPTIMAL"; // Bagong Condition Assessment label
     let actionText = "Motor operating within predicted baseline.";
-    let healthScore = 100;
 
-    // --- LOGIC RESET / OFFLINE CASE ---
+    // --- CONDITION-BASED ASSESSMENT LOGIC ---
+
+    // 1. OFFLINE OR NO DATA
     if (s === "OFFLINE" || (tempVal === 0 && vibVal === 0)) {
-        currentStatus = "NO DATA / DISCONNECTED";
+        currentStatus = "NO DATA FEED";
         statusClass = "status-idle";
+        healthAssessment = "UNKNOWN";
         actionText = "Waiting for fresh sensor data from ESP32...";
-        healthScore = 0;
     } 
-    // --- NORMAL INTERPRETATION FRAMEWORK ---
-    else if (tempVal >= 95) {
-        currentStatus = "CRITICAL: OVERHEATING";
+    // 2. CRITICAL (High Failure Risk)
+    else if (tempVal >= 95 || vibVal >= 4.0) {
+        currentStatus = "CRITICAL FAULT";
         statusClass = "status-critical";
-        actionText = "🔥 <b>STOP:</b> Check for burning smell and shutdown immediately!";
-        healthScore = 10;
+        healthAssessment = "DANGER";
+        actionText = "🚨 <b>SHUTDOWN REQUIRED:</b> High risk of winding failure or bearing seizure.";
         if(motorCube) motorCube.classList.add('cube-vibrate');
     } 
-    else if (tempVal >= 85) {
-        currentStatus = "WARNING: HIGH TEMP";
+    // 3. DEGRADED (Stress/Warning)
+    else if (tempVal >= 85 || vibVal >= 2.0) {
+        currentStatus = "STRESS DETECTED";
         statusClass = "status-warning";
-        actionText = "⚠️ <b>HUMAN VALIDATION:</b> Check for burning smell. Monitor load.";
-        healthScore = 50;
+        healthAssessment = "DEGRADED";
+        actionText = "⚠️ <b>MONITOR:</b> Increased thermal or mechanical load. Check for vibrations.";
     }
-
-    // Vibration Checks
-    if (s !== "OFFLINE") {
-        if (vibVal >= 4.0) {
-            currentStatus = (tempVal >= 85) ? "MULTIPLE FAULTS DETECTED" : "CRITICAL: VIBRATION";
-            statusClass = "status-critical";
-            actionText += "<br>🚨 Severe mechanical shaking. Inspect shaft/bearings.";
-            healthScore = Math.min(healthScore, 20);
-            if(motorCube) motorCube.classList.add('cube-vibrate');
-        } else if (vibVal >= 2.0) {
-            if (statusClass !== "status-critical") {
-                currentStatus = "WARNING: ABNORMAL VIBRATION";
-                statusClass = "status-warning";
-                actionText = "⚙️ Abnormal vibration detected. Check alignment.";
-                healthScore = Math.min(healthScore, 60);
-            }
-        } else if (vibVal < 1.3 && tempVal < 85) {
-            currentStatus = "SYSTEM IDLE / NORMAL";
-            statusClass = "status-idle";
-            actionText = "Baseline monitoring. 0.96G gravity detected.";
-            if(motorCube) motorCube.classList.remove('cube-vibrate');
-        }
+    // 4. IDLE / STABLE
+    else if (vibVal < 1.3 && tempVal < 85) {
+        currentStatus = "SYSTEM IDLE";
+        statusClass = "status-idle";
+        healthAssessment = "STABLE";
+        actionText = "No active load detected. Monitoring gravity baseline (0.96G).";
+        if(motorCube) motorCube.classList.remove('cube-vibrate');
     }
 
     // --- UI UPDATES ---
@@ -175,7 +160,15 @@ function updateDashboard(t, v, s) {
         statLabel.className = "status-text " + statusClass;
     }
     if(aiAction) aiAction.innerHTML = actionText;
-    if(healthDisp) healthDisp.innerText = healthScore > 0 ? healthScore + "%" : "--%";
+
+    if(healthDisp) {
+        healthDisp.innerText = healthAssessment;
+        // Baguhin ang kulay ng text base sa condition
+        healthDisp.style.color = (healthAssessment === "OPTIMAL" || healthAssessment === "STABLE") ? "#22c55e" : 
+                                 (healthAssessment === "DEGRADED") ? "#fbbf24" : 
+                                 (healthAssessment === "DANGER") ? "#ef4444" : "#94a3b8";
+    }
+
     if(light) light.className = "status-light " + statusClass;
 
     // Chart Update
