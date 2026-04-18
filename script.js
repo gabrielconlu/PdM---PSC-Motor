@@ -49,11 +49,9 @@ function initChart() {
 }
 
 // --- LINEAR REGRESSION HELPER ---
-// Calculates the slope (m) of a dataset
 function calculateSlope(data) {
     const n = data.length;
     if (n < 2) return 0;
-
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
     for (let i = 0; i < n; i++) {
         sumX += i;
@@ -61,7 +59,6 @@ function calculateSlope(data) {
         sumXY += i * data[i];
         sumX2 += i * i;
     }
-    // Slope formula: m = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX^2)
     return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
 }
 
@@ -81,13 +78,37 @@ async function startMonitoring() {
 async function fetchDataFromSheets() {
     if (!isMonitoring) return;
     try {
+        const syncLabel = document.getElementById('sync-status');
+        if(syncLabel) syncLabel.innerText = "Syncing...";
+
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
+
         if (data.timestamp) {
+            const dataTime = new Date(data.timestamp).getTime(); 
+            const currentTime = new Date().getTime();
+            const diffInSeconds = (currentTime - dataTime) / 1000;
+
+            // Freshness Check: 120 seconds para iwas false "Offline"
+            if (diffInSeconds > 120) {
+                if(syncLabel) {
+                    syncLabel.innerText = "Data Stale";
+                    syncLabel.style.color = "#fbbf24"; 
+                }
+                updateDashboard(0, 0, "OFFLINE");
+                return; 
+            }
+
             updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
+            if(syncLabel) {
+                syncLabel.innerText = "Live";
+                syncLabel.style.color = "#22c55e"; 
+            }
         }
     } catch (e) {
         logEvent("ERROR: Sync failed", "error");
+        const syncLabel = document.getElementById('sync-status');
+        if(syncLabel) syncLabel.innerText = "Offline";
     }
 }
 
@@ -95,16 +116,17 @@ function updateDashboard(t, v, s) {
     const tempVal = parseFloat(t);
     const vibVal = parseFloat(v);
 
-    const tDisp = document.getElementById('temp-val');
-    const vDisp = document.getElementById('vib-val');
+    const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
+    const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
     const statLabel = document.getElementById('status-label');
     const aiAction = document.getElementById('ai-action-step');
     const healthDisp = document.getElementById('motor-health-score');
+    const light = document.querySelector('.status-light');
 
     if(tDisp) tDisp.innerText = tempVal.toFixed(1);
     if(vDisp) vDisp.innerText = vibVal.toFixed(2);
 
-    if (isMonitoring) {
+    if (isMonitoring && s !== "OFFLINE") {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(now);
         myChart.data.datasets[0].data.push(tempVal);
@@ -119,7 +141,6 @@ function updateDashboard(t, v, s) {
     // --- REGRESSION ANALYSIS ---
     const last10Temp = myChart.data.datasets[0].data.slice(-10);
     const last10Vib = myChart.data.datasets[1].data.slice(-10);
-    
     const tempSlope = calculateSlope(last10Temp);
     const vibSlope = calculateSlope(last10Vib);
 
@@ -128,9 +149,14 @@ function updateDashboard(t, v, s) {
     let healthAssessment = "OPTIMAL"; 
     let actionText = "Motor baseline is steady.";
 
-    // Logic using Slope (m)
-    // Positive slope means temperature is RISING
-    if (tempVal >= 85 && tempSlope > 0.5) {
+    if (s === "OFFLINE" || !isMonitoring) {
+        currentStatus = "DISCONNECTED";
+        statusClass = "status-idle";
+        healthAssessment = "OFFLINE";
+        actionText = "Dashboard paused. Connect to resume data feed.";
+    } 
+    // Regression Alert para sa mabilis na pag-init
+    else if (tempVal >= 85 && tempSlope > 0.5) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
@@ -146,9 +172,10 @@ function updateDashboard(t, v, s) {
         currentStatus = "VIB INCREASE";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment or bearings.`;
+        actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment.`;
     }
 
+    // UI Apply
     if(statLabel) {
         statLabel.innerText = currentStatus;
         statLabel.className = "status-text " + statusClass;
@@ -158,6 +185,7 @@ function updateDashboard(t, v, s) {
         healthDisp.innerText = healthAssessment;
         healthDisp.style.color = (healthAssessment === "OPTIMAL") ? "#22c55e" : (healthAssessment === "DANGER") ? "#ef4444" : "#fbbf24";
     }
+    if(light) light.className = "status-light " + statusClass;
 }
 
 function stopMonitoring() {
@@ -167,6 +195,12 @@ function stopMonitoring() {
     myChart.data.labels = [];
     myChart.data.datasets.forEach(d => d.data = []);
     myChart.update();
+    
+    const connBtn = document.getElementById('connect-btn');
+    const discBtn = document.getElementById('disconnect-btn');
+    if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
+    if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
+
     logEvent("PAUSED: Regression data cleared.");
 }
 
