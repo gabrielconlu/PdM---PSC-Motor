@@ -4,10 +4,10 @@ let myChart;
 let fetchInterval;
 let isMonitoring = false;
 
-// --- INITIALIZATION ---
+// --- 1. INITIALIZATION ---
 window.addEventListener('load', () => {
     initChart();
-    loadLogsFromStorage(); // I-recover ang lumang logs pagka-refresh
+    loadLogsFromStorage(); // I-recover ang logs mula sa browser memory
     logEvent("SYSTEM READY: Dashboard initialized.");
 });
 
@@ -51,14 +51,13 @@ function initChart() {
     });
 }
 
-// --- LOGGING SYSTEM (WITH LOCALSTORAGE) ---
+// --- 2. PERSISTENT LOGGING SYSTEM ---
 function logEvent(msg, type = "") {
     const entryData = {
         time: new Date().toLocaleTimeString(),
         message: msg,
         type: type
     };
-
     renderLogEntry(entryData);
     saveLogToStorage(entryData);
 }
@@ -66,7 +65,6 @@ function logEvent(msg, type = "") {
 function renderLogEntry(log) {
     const list = document.getElementById('event-list') || document.getElementById('system-logs');
     if (!list) return;
-
     const entry = document.createElement('div');
     entry.className = "log-entry";
     if (log.type === "error") entry.style.color = "#ef4444";
@@ -77,7 +75,7 @@ function renderLogEntry(log) {
 function saveLogToStorage(log) {
     let logs = JSON.parse(localStorage.getItem('motor_logs')) || [];
     logs.push(log);
-    if (logs.length > 50) logs.shift(); // Panatilihing 50 logs lang
+    if (logs.length > 50) logs.shift(); 
     localStorage.setItem('motor_logs', JSON.stringify(logs));
 }
 
@@ -86,16 +84,11 @@ function loadLogsFromStorage() {
     logs.forEach(log => renderLogEntry(log));
 }
 
-// --- DATA FETCHING & MONITORING ---
+// --- 3. DATA ACQUISITION ---
 async function startMonitoring() {
     isMonitoring = true;
-    const connBtn = document.getElementById('connect-btn');
-    const discBtn = document.getElementById('disconnect-btn');
-    
-    if(connBtn) connBtn.style.setProperty('display', 'none', 'important');
-    if(discBtn) discBtn.style.setProperty('display', 'inline-block', 'important');
-    
-    logEvent("MONITORING STARTED: Checking for live data...");
+    toggleButtons(true);
+    logEvent("MONITORING STARTED: Analyzing live sensor streams...");
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
@@ -112,38 +105,31 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // --- RECENT DATA CHECK (30 SECONDS TOLERANCE) ---
+            // Strict Check: 30 seconds tolerance para siguradong LIVE data
             if (isNaN(dataTime) || diffInSeconds > 30) { 
-                if(syncLabel) {
-                    syncLabel.innerText = "Stale Data (Offline)";
-                    syncLabel.style.color = "#fbbf24"; 
-                }
+                if(syncLabel) { syncLabel.innerText = "Stale Data (Offline)"; syncLabel.style.color = "#fbbf24"; }
                 updateDashboard(0, 0, "OFFLINE");
                 return; 
             }
 
             updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
-            if(syncLabel) {
-                syncLabel.innerText = "Live";
-                syncLabel.style.color = "#22c55e"; 
-            }
+            if(syncLabel) { syncLabel.innerText = "Live"; syncLabel.style.color = "#22c55e"; }
         }
     } catch (e) {
-        logEvent("ERROR: Connection failed", "error");
+        logEvent("ERROR: Sync failed", "error");
     }
 }
 
+// --- 4. PREDICTIVE ANALYSIS & UI ---
 function updateDashboard(t, v, s) {
     const tempVal = parseFloat(t) || 0;
     const vibVal = parseFloat(v) || 0;
 
-    // UI Displays
-    const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
-    const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
-    if(tDisp) tDisp.innerText = (s === "OFFLINE") ? "0.0" : tempVal.toFixed(1);
-    if(vDisp) vDisp.innerText = (s === "OFFLINE") ? "0.00" : vibVal.toFixed(2);
+    // Update Numerical Displays
+    updateTextElement('temp-val', tempVal.toFixed(1), s);
+    updateTextElement('vib-val', vibVal.toFixed(2), s);
 
-    // Chart Update
+    // Update Chart
     if (isMonitoring && s !== "OFFLINE" && (tempVal !== 0 || vibVal !== 0)) {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(now);
@@ -157,9 +143,9 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // Status & AI Action Logic
-    const tempArray = myChart.data.datasets[0].data;
-    const tempSlope = calculateSlope(tempArray.slice(-10));
+    // --- LINEAR REGRESSION LOGIC ---
+    const tempSlope = calculateSlope(myChart.data.datasets[0].data.slice(-10));
+    const vibSlope = calculateSlope(myChart.data.datasets[1].data.slice(-10));
     
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
@@ -168,11 +154,19 @@ function updateDashboard(t, v, s) {
     if (s === "OFFLINE") {
         currentStatus = "DISCONNECTED";
         statusClass = "status-idle";
-        actionText = "No recent data detected. Waiting for hardware...";
-    } else if (tempVal >= 85 && tempSlope > 0.5) {
+        actionText = "No recent data detected. Check hardware connection.";
+    } 
+    // CAPACITOR FAULT LOGIC: High Vib Trend + Rapid Temp Rise
+    else if (vibSlope > 0.15 && tempSlope > 0.4) {
+        currentStatus = "POTENTIAL CAPACITOR FAULT";
+        statusClass = "status-warning";
+        actionText = `⚠️ <b>PREDICTIVE ALERT:</b> Unstable vibration + rising temp. Possible capacitor failure (No burning smell).`;
+    }
+    // THERMAL RUNAWAY LOGIC: Extreme Slope
+    else if (tempVal >= 85 && tempSlope > 0.5) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
-        actionText = `🚨 <b>ALERT:</b> Critical temp spike detected (+${tempSlope.toFixed(2)}°/sample).`;
+        actionText = `🚨 <b>CRITICAL:</b> Dangerous temperature trend (+${tempSlope.toFixed(2)}°/sample). Shut down now!`;
     }
 
     const statLabel = document.getElementById('status-label');
@@ -181,7 +175,7 @@ function updateDashboard(t, v, s) {
     if(aiAction) aiAction.innerHTML = actionText;
 }
 
-// --- HELPERS ---
+// --- 5. HELPERS ---
 function calculateSlope(data) {
     if (!data || data.length < 3) return 0; 
     const n = data.length;
@@ -203,14 +197,22 @@ function parseSheetDate(dateStr) {
     return d;
 }
 
+function toggleButtons(monitoring) {
+    const connBtn = document.getElementById('connect-btn');
+    const discBtn = document.getElementById('disconnect-btn');
+    if(connBtn) connBtn.style.display = monitoring ? 'none' : 'inline-block';
+    if(discBtn) discBtn.style.display = monitoring ? 'inline-block' : 'none';
+}
+
+function updateTextElement(id, val, status) {
+    const el = document.getElementById(id);
+    if(el) el.innerText = (status === "OFFLINE") ? "0.0" : val;
+}
+
 function stopMonitoring() {
     isMonitoring = false;
     clearInterval(fetchInterval);
     updateDashboard(0, 0, "OFFLINE");
     logEvent("PAUSED: Monitoring stopped.");
-    
-    const connBtn = document.getElementById('connect-btn');
-    const discBtn = document.getElementById('disconnect-btn');
-    if(connBtn) connBtn.style.display = 'inline-block';
-    if(discBtn) discBtn.style.display = 'none';
+    toggleButtons(false);
 }
