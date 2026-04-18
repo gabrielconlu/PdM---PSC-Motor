@@ -67,27 +67,23 @@ async function fetchDataFromSheets() {
             syncLabel.style.color = "#3b82f6";
         }
 
-        // Cache busting and fetch
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
         if (data.temp !== undefined && data.timestamp) {
-            // --- REAL-TIME VALIDATION ---
             const dataTime = new Date(data.timestamp).getTime(); 
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // Kung ang data ay mas matanda sa 60 seconds, huwag i-update ang dashboard
+            // REAL-TIME FILTER: Ignore data older than 60 seconds
             if (diffInSeconds > 60) {
                 if(syncLabel) {
-                    syncLabel.innerText = "No Recent Data";
-                    syncLabel.style.color = "#fbbf24"; // Yellow/Orange
+                    syncLabel.innerText = "No Recent Data (Waiting...)";
+                    syncLabel.style.color = "#fbbf24"; 
                 }
-                console.warn("Stale data detected. Difference: " + diffInSeconds + "s");
-                return; // Exit function, don't update dashboard
+                return; 
             }
 
-            // Kung fresh ang data (less than 60s old), update dashboard
             updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
             
             if(syncLabel) {
@@ -112,40 +108,69 @@ function updateDashboard(t, v, s) {
     const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
     const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
     const statLabel = document.getElementById('status-label');
+    const aiAction = document.getElementById('ai-action-step');
     const light = document.querySelector('.status-light');
     const motorCube = document.getElementById('motor-cube');
+    const healthDisp = document.getElementById('motor-health-score');
 
     if(tDisp) tDisp.innerText = tempVal.toFixed(1);
     if(vDisp) vDisp.innerText = vibVal.toFixed(2);
 
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
+    let actionText = "Motor operating within predicted baseline.";
     let healthScore = 100;
 
-    // Stable 0.96 Baseline Logic
-    if (tempVal >= 85 || s === "CRITICAL" || s === "SHUTDOWN") {
-        currentStatus = "CRITICAL: SHUTDOWN";
+    // --- DATA INTERPRETATION LOGIC (Rule-Based Expert System) ---
+
+    // 1. Critical Overheating Check
+    if (tempVal >= 95) {
+        currentStatus = "CRITICAL: OVERHEATING";
         statusClass = "status-critical";
+        actionText = "🔥 <b>STOP:</b> Check for burning smell and shutdown immediately!";
         healthScore = 10;
         if(motorCube) motorCube.classList.add('cube-vibrate');
-    } else if (tempVal >= 75 || vibVal >= 3.0) {
-        currentStatus = "WARNING: HIGH LOAD";
+    } 
+    // 2. Warning Overheating Check
+    else if (tempVal >= 85) {
+        currentStatus = "WARNING: HIGH TEMP";
         statusClass = "status-warning";
+        actionText = "⚠️ <b>HUMAN VALIDATION:</b> Check for burning smell. Monitor load.";
         healthScore = 50;
-    } else if (vibVal < 1.1) {
-        currentStatus = "SYSTEM IDLE";
+    }
+
+    // 3. Vibration Check (Can override or add to status)
+    if (vibVal >= 4.0) {
+        currentStatus = (tempVal >= 85) ? "MULTIPLE FAULTS DETECTED" : "CRITICAL: VIBRATION";
+        statusClass = "status-critical";
+        actionText += "<br>🚨 Severe mechanical shaking. Inspect shaft/bearings.";
+        healthScore = Math.min(healthScore, 20);
+        if(motorCube) motorCube.classList.add('cube-vibrate');
+    } else if (vibVal >= 2.0) {
+        if (statusClass !== "status-critical") {
+            currentStatus = "WARNING: ABNORMAL VIBRATION";
+            statusClass = "status-warning";
+            actionText = "⚙️ Abnormal vibration. Check alignment and mounting.";
+            healthScore = Math.min(healthScore, 60);
+        }
+    }
+
+    // 4. Baseline/Idle Detection
+    if (vibVal < 1.3 && tempVal < 85) {
+        currentStatus = "SYSTEM IDLE / NORMAL";
         statusClass = "status-idle";
-        healthScore = 100;
+        actionText = "Baseline monitoring. 0.96G gravity detected.";
         if(motorCube) motorCube.classList.remove('cube-vibrate');
     }
 
-    if(statLabel) statLabel.innerText = currentStatus;
-    if(light) {
-        light.className = "status-light " + statusClass;
+    // --- UI UPDATES ---
+    if(statLabel) {
+        statLabel.innerText = currentStatus;
+        statLabel.className = "status-text " + statusClass;
     }
-
-    const healthDisp = document.getElementById('motor-health-score');
+    if(aiAction) aiAction.innerHTML = actionText;
     if(healthDisp) healthDisp.innerText = healthScore + "%";
+    if(light) light.className = "status-light " + statusClass;
 
     // Chart Update
     const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
@@ -164,10 +189,8 @@ function stopMonitoring() {
     clearInterval(fetchInterval);
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
-    
     if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
-    
     logEvent("PAUSED: Sync stopped.");
 }
 
