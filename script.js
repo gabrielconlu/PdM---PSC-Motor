@@ -48,7 +48,26 @@ function initChart() {
     });
 }
 
-// --- DATE PARSING HELPER (Fixes Offline Issue) ---
+// --- LINEAR REGRESSION HELPER (With Safety Guard) ---
+function calculateSlope(data) {
+    // Safety check: Kailangan ng at least 3 points para hindi mag-error ang calculation
+    if (!data || data.length < 3) return 0; 
+
+    const n = data.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let i = 0; i < n; i++) {
+        sumX += i;
+        sumY += data[i];
+        sumXY += i * data[i];
+        sumX2 += i * i;
+    }
+    const denominator = (n * sumX2 - sumX * sumX);
+    if (denominator === 0) return 0; // Iwas division by zero error
+
+    return (n * sumXY - sumX * sumY) / denominator;
+}
+
+// --- DATE PARSING HELPER ---
 function parseSheetDate(dateStr) {
     let d = new Date(dateStr);
     if (isNaN(d.getTime())) {
@@ -68,7 +87,7 @@ async function startMonitoring() {
     if(connBtn) connBtn.style.setProperty('display', 'none', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'inline-block', 'important');
     
-    logEvent("START: Monitoring real-time sensor data...");
+    logEvent("START: Applying Linear Regression monitoring...");
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
@@ -87,9 +106,9 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            console.log(`Gap: ${diffInSeconds}s | Sheet: ${data.timestamp}`);
+            console.log(`Gap: ${diffInSeconds}s | Sheet Time: ${data.timestamp}`);
 
-            // Extended tolerance to 5 minutes
+            // Extended tolerance to 5 minutes para iwas "Offline" bug
             if (isNaN(dataTime) || diffInSeconds > 300) {
                 if(syncLabel) {
                     syncLabel.innerText = "Data Stale/Offline";
@@ -130,6 +149,8 @@ function updateDashboard(t, v, s) {
         myChart.data.labels.push(now);
         myChart.data.datasets[0].data.push(tempVal);
         myChart.data.datasets[1].data.push(vibVal);
+        
+        // Sliding window for regression (limit to 15 points)
         if (myChart.data.labels.length > 15) {
             myChart.data.labels.shift();
             myChart.data.datasets.forEach(d => d.data.shift());
@@ -137,7 +158,13 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // --- SIMPLE THRESHOLD LOGIC (No Regression) ---
+    // --- LINEAR REGRESSION ANALYSIS ---
+    const tempArray = myChart.data.datasets[0].data;
+    const vibArray = myChart.data.datasets[1].data;
+    
+    const tempSlope = calculateSlope(tempArray.slice(-10));
+    const vibSlope = calculateSlope(vibArray.slice(-10));
+
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
     let healthAssessment = "OPTIMAL"; 
@@ -149,17 +176,26 @@ function updateDashboard(t, v, s) {
         healthAssessment = "OFFLINE";
         actionText = "Dashboard paused. Connect to resume data feed.";
     } 
-    else if (tempVal >= 90 || vibVal >= 4.0) {
-        currentStatus = "CRITICAL LIMIT";
+    // 1. Regression Alert (Rising Fast)
+    else if (tempVal >= 85 && tempSlope > 0.5) {
+        currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        actionText = `🚨 <b>ALERT:</b> Critical threshold exceeded. Check for burning smell or humming.`;
+        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast, monitor for possible burning (+${tempSlope.toFixed(2)}°/sample).`;
     } 
-    else if (tempVal >= 80 || vibVal >= 2.0) {
-        currentStatus = "STRESS DETECTED";
+    // 2. High Temp but Stable (Slope is near zero)
+    else if (tempVal >= 85 && Math.abs(tempSlope) <= 0.1) {
+        currentStatus = "HIGH TEMP STABLE";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        actionText = `⚠️ <b>WARNING:</b> High load detected. Monitor motor temperature closely.`;
+        actionText = `⚠️ <b>NOTICE:</b> Motor is hot but temperature has stabilized (Slope: ${tempSlope.toFixed(2)}).`;
+    }
+    // 3. Vibration Trend
+    else if (vibSlope > 0.2) {
+        currentStatus = "VIB INCREASE";
+        statusClass = "status-warning";
+        healthAssessment = "DEGRADED";
+        actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment.`;
     }
 
     // --- UI UPDATES ---
@@ -188,7 +224,7 @@ function stopMonitoring() {
     if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
 
-    logEvent("PAUSED: Dashboard monitoring stopped.");
+    logEvent("PAUSED: Monitoring stopped.");
 }
 
 function logEvent(msg, type = "") {
