@@ -70,20 +70,23 @@ async function fetchDataFromSheets() {
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
-        if (data.temp !== undefined && data.timestamp) {
+        // Check if data is fresh (within 60 seconds)
+        if (data.timestamp) {
             const dataTime = new Date(data.timestamp).getTime(); 
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // REAL-TIME FILTER: Ignore data older than 60 seconds
             if (diffInSeconds > 60) {
                 if(syncLabel) {
-                    syncLabel.innerText = "No Recent Data (Waiting...)";
+                    syncLabel.innerText = "No Recent Data";
                     syncLabel.style.color = "#fbbf24"; 
                 }
+                // RESET TO ZERO if no recent data is sent from ESP32
+                updateDashboard(0, 0, "OFFLINE");
                 return; 
             }
 
+            // Fresh data found
             updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
             
             if(syncLabel) {
@@ -121,17 +124,21 @@ function updateDashboard(t, v, s) {
     let actionText = "Motor operating within predicted baseline.";
     let healthScore = 100;
 
-    // --- DATA INTERPRETATION LOGIC (Rule-Based Expert System) ---
-
-    // 1. Critical Overheating Check
-    if (tempVal >= 95) {
+    // --- LOGIC RESET / OFFLINE CASE ---
+    if (s === "OFFLINE" || (tempVal === 0 && vibVal === 0)) {
+        currentStatus = "NO DATA / DISCONNECTED";
+        statusClass = "status-idle";
+        actionText = "Waiting for fresh sensor data from ESP32...";
+        healthScore = 0;
+    } 
+    // --- NORMAL INTERPRETATION FRAMEWORK ---
+    else if (tempVal >= 95) {
         currentStatus = "CRITICAL: OVERHEATING";
         statusClass = "status-critical";
         actionText = "🔥 <b>STOP:</b> Check for burning smell and shutdown immediately!";
         healthScore = 10;
         if(motorCube) motorCube.classList.add('cube-vibrate');
     } 
-    // 2. Warning Overheating Check
     else if (tempVal >= 85) {
         currentStatus = "WARNING: HIGH TEMP";
         statusClass = "status-warning";
@@ -139,28 +146,27 @@ function updateDashboard(t, v, s) {
         healthScore = 50;
     }
 
-    // 3. Vibration Check (Can override or add to status)
-    if (vibVal >= 4.0) {
-        currentStatus = (tempVal >= 85) ? "MULTIPLE FAULTS DETECTED" : "CRITICAL: VIBRATION";
-        statusClass = "status-critical";
-        actionText += "<br>🚨 Severe mechanical shaking. Inspect shaft/bearings.";
-        healthScore = Math.min(healthScore, 20);
-        if(motorCube) motorCube.classList.add('cube-vibrate');
-    } else if (vibVal >= 2.0) {
-        if (statusClass !== "status-critical") {
-            currentStatus = "WARNING: ABNORMAL VIBRATION";
-            statusClass = "status-warning";
-            actionText = "⚙️ Abnormal vibration. Check alignment and mounting.";
-            healthScore = Math.min(healthScore, 60);
+    // Vibration Checks
+    if (s !== "OFFLINE") {
+        if (vibVal >= 4.0) {
+            currentStatus = (tempVal >= 85) ? "MULTIPLE FAULTS DETECTED" : "CRITICAL: VIBRATION";
+            statusClass = "status-critical";
+            actionText += "<br>🚨 Severe mechanical shaking. Inspect shaft/bearings.";
+            healthScore = Math.min(healthScore, 20);
+            if(motorCube) motorCube.classList.add('cube-vibrate');
+        } else if (vibVal >= 2.0) {
+            if (statusClass !== "status-critical") {
+                currentStatus = "WARNING: ABNORMAL VIBRATION";
+                statusClass = "status-warning";
+                actionText = "⚙️ Abnormal vibration detected. Check alignment.";
+                healthScore = Math.min(healthScore, 60);
+            }
+        } else if (vibVal < 1.3 && tempVal < 85) {
+            currentStatus = "SYSTEM IDLE / NORMAL";
+            statusClass = "status-idle";
+            actionText = "Baseline monitoring. 0.96G gravity detected.";
+            if(motorCube) motorCube.classList.remove('cube-vibrate');
         }
-    }
-
-    // 4. Baseline/Idle Detection
-    if (vibVal < 1.3 && tempVal < 85) {
-        currentStatus = "SYSTEM IDLE / NORMAL";
-        statusClass = "status-idle";
-        actionText = "Baseline monitoring. 0.96G gravity detected.";
-        if(motorCube) motorCube.classList.remove('cube-vibrate');
     }
 
     // --- UI UPDATES ---
@@ -169,7 +175,7 @@ function updateDashboard(t, v, s) {
         statLabel.className = "status-text " + statusClass;
     }
     if(aiAction) aiAction.innerHTML = actionText;
-    if(healthDisp) healthDisp.innerText = healthScore + "%";
+    if(healthDisp) healthDisp.innerText = healthScore > 0 ? healthScore + "%" : "--%";
     if(light) light.className = "status-light " + statusClass;
 
     // Chart Update
