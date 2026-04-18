@@ -166,4 +166,68 @@ function updateDashboard(t, v, s) {
     let healthAssessment = "OPTIMAL"; 
     let actionText = "Motor operating within predicted baseline.";
 
-    if (s === "OFFLINE" || !
+    if (s === "OFFLINE" || !isMonitoring) {
+        currentStatus = "DISCONNECTED";
+        statusClass = "status-idle";
+        healthAssessment = "OFFLINE";
+        actionText = "No recent data detected. Connect hardware to start.";
+    } 
+    else if (tempVal >= 85 && tempSlope > 0.5) {
+        currentStatus = "THERMAL RUNAWAY";
+        statusClass = "status-critical";
+        healthAssessment = "DANGER";
+        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast (+${tempSlope.toFixed(2)}°/sample).`;
+    } 
+    else if (tempVal >= 85 && Math.abs(tempSlope) <= 0.1) {
+        currentStatus = "HIGH TEMP STABLE";
+        statusClass = "status-warning";
+        healthAssessment = "DEGRADED";
+        actionText = `⚠️ <b>NOTICE:</b> Motor is hot but stable.`;
+    }
+
+    if(statLabel) {
+        statLabel.innerText = currentStatus;
+        statLabel.className = "status-text " + statusClass;
+    }
+    if(aiAction) aiAction.innerHTML = actionText;
+    if(healthDisp) {
+        healthDisp.innerText = healthAssessment;
+        healthDisp.style.color = (healthAssessment === "OPTIMAL") ? "#22c55e" : (healthAssessment === "DANGER") ? "#ef4444" : "#fbbf24";
+    }
+    if(light) light.className = "status-light " + statusClass;
+}
+
+function stopMonitoring() {
+    isMonitoring = false;
+    clearInterval(fetchInterval);
+    
+    // Force reset displays to zero
+    const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
+    const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
+    if(tDisp) tDisp.innerText = "0.0";
+    if(vDisp) vDisp.innerText = "0.00";
+
+    updateDashboard(0, 0, "OFFLINE");
+    myChart.data.labels = [];
+    myChart.data.datasets.forEach(d => d.data = []);
+    myChart.update();
+    
+    const connBtn = document.getElementById('connect-btn');
+    const discBtn = document.getElementById('disconnect-btn');
+    if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
+    if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
+
+    logEvent("PAUSED: Dashboard cleared.");
+}
+
+function logEvent(msg, type = "") {
+    const list = document.getElementById('event-list') || document.getElementById('system-logs');
+    if(list) {
+        const entry = document.createElement('div');
+        entry.className = "log-entry";
+        if(type === "error") entry.style.color = "#ef4444";
+        const time = new Date().toLocaleTimeString();
+        entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+        list.prepend(entry);
+    }
+}
