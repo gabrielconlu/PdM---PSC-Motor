@@ -5,6 +5,7 @@
     --text-secondary: #94a3b8;
     --accent-blue: #3b82f6;
     --accent-green: #22c55e;
+    --accent-yellow: #fbbf24;
     --accent-red: #ef4444;
 }
 
@@ -16,11 +17,49 @@ body {
     padding: 20px;
 }
 
+/* --- NAVIGATION / CONTROLS (Upper Right) --- */
+.top-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+
+/* Button Adjustments */
+.btn-connect, #disconnect-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-connect {
+    background: var(--accent-green);
+    color: white;
+}
+
+#disconnect-btn {
+    background: var(--accent-red);
+    color: white;
+    display: none; /* Default hidden */
+}
+
+.btn-connect:hover { transform: translateY(-2px); background: #1aad50; }
+#disconnect-btn:hover { transform: translateY(-2px); background: #dc2626; }
+
+/* --- HEADER --- */
 .header {
     text-align: center;
     margin-bottom: 30px;
+    padding-right: 180px; /* Space for the buttons to avoid overlap */
 }
 
+/* --- MAIN LAYOUT --- */
 .container {
     max-width: 900px;
     margin: 0 auto;
@@ -37,6 +76,11 @@ body {
     border-left: 5px solid var(--accent-blue);
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
+
+.status-text.status-normal { color: var(--accent-green); }
+.status-text.status-warning { color: var(--accent-yellow); }
+.status-text.status-critical { color: var(--accent-red); }
+.status-text.status-idle { color: var(--text-secondary); }
 
 .ai-subtext {
     color: var(--text-secondary);
@@ -66,6 +110,7 @@ body {
     text-align: center;
 }
 
+/* Status Lights for Framework */
 .status-light {
     width: 12px;
     height: 12px;
@@ -76,6 +121,11 @@ body {
     right: 15px;
     box-shadow: 0 0 8px rgba(0,0,0,0.5);
 }
+
+.status-light.status-normal { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+.status-light.status-warning { background: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
+.status-light.status-critical { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+.status-light.status-idle { background: var(--text-secondary); }
 
 .label {
     color: var(--text-secondary);
@@ -114,6 +164,7 @@ body {
     padding-bottom: 8px;
     margin-bottom: 10px;
     font-size: 0.8rem;
+    color: var(--text-secondary);
 }
 
 #event-list {
@@ -124,21 +175,13 @@ body {
     color: #00ff88;
 }
 
-#event-list li {
+.log-entry {
     margin-bottom: 5px;
     border-bottom: 1px solid #1e293b33;
+    padding: 2px 0;
 }
 
-/* Buttons */
-.btn-connect {
-    background: var(--accent-blue);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-}
+.log-time { color: var(--accent-blue); margin-right: 8px; }
 
 .clear-btn {
     background: transparent;
@@ -148,5 +191,3 @@ body {
     border-radius: 4px;
     cursor: pointer;
 }
-
-.btn-connect:hover { background: #2563eb; }
