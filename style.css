@@ -15,6 +15,7 @@ body {
     color: var(--text-primary);
     margin: 0;
     padding: 20px;
+    overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 /* --- NAVIGATION / CONTROLS (Upper Right) --- */
@@ -29,13 +30,14 @@ body {
 
 /* Button Adjustments */
 .btn-connect, #disconnect-btn {
-    padding: 10px 20px;
+    padding: 10px 24px;
     border-radius: 8px;
     border: none;
     cursor: pointer;
     font-weight: bold;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-connect {
@@ -44,19 +46,30 @@ body {
 }
 
 #disconnect-btn {
-    background: var(--accent-red);
+    background: #475569; /* Slate gray para sa disconnect */
     color: white;
-    display: none; /* Default hidden */
+    display: none; /* Hidden by default sa JS */
 }
 
-.btn-connect:hover { transform: translateY(-2px); background: #1aad50; }
-#disconnect-btn:hover { transform: translateY(-2px); background: #dc2626; }
+.btn-connect:hover { transform: translateY(-2px); background: #1aad50; box-shadow: 0 6px 15px rgba(34, 197, 94, 0.3); }
+#disconnect-btn:hover { transform: translateY(-2px); background: #334155; }
 
 /* --- HEADER --- */
 .header {
     text-align: center;
-    margin-bottom: 30px;
-    padding-right: 180px; /* Space for the buttons to avoid overlap */
+    margin-bottom: 40px;
+    margin-top: 20px;
+}
+
+.header h2 {
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+}
+
+#sync-status {
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
 /* --- MAIN LAYOUT --- */
@@ -68,13 +81,13 @@ body {
     gap: 20px;
 }
 
-/* AI Box Style */
+/* AI Box Style (Condition Assessment) */
 .ai-box {
     background: var(--card-bg);
     padding: 20px;
     border-radius: 12px;
     border-left: 5px solid var(--accent-blue);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
 .status-text.status-normal { color: var(--accent-green); }
@@ -84,110 +97,142 @@ body {
 
 .ai-subtext {
     color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin: 5px 0 0 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 8px 0;
 }
 
 .stats-row {
     margin-top: 15px;
-    font-size: 0.85rem;
-    display: flex;
-    gap: 25px;
+    padding-top: 15px;
+    border-top: 1px solid #334155;
+    font-size: 0.9rem;
+}
+
+#motor-health-score {
+    font-size: 1.1rem;
+    margin-left: 5px;
 }
 
 /* Metrics Grid */
 .metrics-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
 }
 
 .card {
     background: var(--card-bg);
-    padding: 25px;
+    padding: 30px 20px;
     border-radius: 12px;
     position: relative;
     text-align: center;
+    transition: transform 0.2s;
 }
 
-/* Status Lights for Framework */
+.card:hover { transform: translateY(-5px); }
+
+/* Status Lights */
 .status-light {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: gray;
+    background: #475569;
     position: absolute;
     top: 15px;
     right: 15px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
 }
 
-.status-light.status-normal { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
-.status-light.status-warning { background: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
-.status-light.status-critical { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
-.status-light.status-idle { background: var(--text-secondary); }
+.status-light.status-normal { background: var(--accent-green); box-shadow: 0 0 12px var(--accent-green); }
+.status-light.status-warning { background: var(--accent-yellow); box-shadow: 0 0 12px var(--accent-yellow); }
+.status-light.status-critical { background: var(--accent-red); box-shadow: 0 0 12px var(--accent-red); }
 
 .label {
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
 }
 
 .value {
-    font-size: 2.5rem;
-    font-weight: bold;
-    margin-top: 10px;
+    font-size: 2.8rem;
+    font-weight: 800;
 }
 
-/* Chart & Logs */
+.unit {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-left: 5px;
+}
+
+/* Chart Box */
 .chart-box {
     background: var(--card-bg);
-    padding: 20px;
+    padding: 25px;
     border-radius: 12px;
-    height: 350px;
+    height: 380px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
+/* Log Box (Terminal Style) */
 .log-box {
     background: #020617;
     border-radius: 12px;
-    padding: 15px;
-    font-family: 'Courier New', Courier, monospace;
-    max-height: 200px;
-    overflow-y: auto;
+    border: 1px solid #1e293b;
+    padding: 0;
+    overflow: hidden;
 }
 
 .log-header {
+    background: #1e293b;
     display: flex;
     justify-content: space-between;
-    border-bottom: 1px solid #1e293b;
-    padding-bottom: 8px;
-    margin-bottom: 10px;
-    font-size: 0.8rem;
+    align-items: center;
+    padding: 10px 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
     color: var(--text-secondary);
+    text-transform: uppercase;
 }
 
-#event-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    font-size: 0.75rem;
-    color: #00ff88;
+#system-logs {
+    padding: 15px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.8rem;
 }
 
 .log-entry {
-    margin-bottom: 5px;
-    border-bottom: 1px solid #1e293b33;
-    padding: 2px 0;
+    margin-bottom: 6px;
+    color: #e2e8f0;
+    border-bottom: 1px solid #ffffff05;
+    padding-bottom: 4px;
 }
 
-.log-time { color: var(--accent-blue); margin-right: 8px; }
+.log-time { color: var(--accent-blue); opacity: 0.8; margin-right: 10px; }
 
 .clear-btn {
-    background: transparent;
-    border: 1px solid var(--text-secondary);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #475569;
     color: var(--text-secondary);
-    padding: 5px 12px;
+    padding: 3px 10px;
     border-radius: 4px;
+    font-size: 0.7rem;
     cursor: pointer;
+    transition: all 0.2s;
 }
+
+.clear-btn:hover {
+    background: var(--accent-red);
+    color: white;
+    border-color: var(--accent-red);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
