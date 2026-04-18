@@ -48,8 +48,11 @@ function initChart() {
     });
 }
 
+// --- LINEAR REGRESSION HELPER (With Safety Guard) ---
 function calculateSlope(data) {
+    // Safety check: Kailangan ng at least 3 points para hindi mag-error ang calculation
     if (!data || data.length < 3) return 0; 
+
     const n = data.length;
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
     for (let i = 0; i < n; i++) {
@@ -59,10 +62,12 @@ function calculateSlope(data) {
         sumX2 += i * i;
     }
     const denominator = (n * sumX2 - sumX * sumX);
-    if (denominator === 0) return 0;
+    if (denominator === 0) return 0; // Iwas division by zero error
+
     return (n * sumXY - sumX * sumY) / denominator;
 }
 
+// --- DATE PARSING HELPER ---
 function parseSheetDate(dateStr) {
     let d = new Date(dateStr);
     if (isNaN(d.getTime())) {
@@ -80,9 +85,9 @@ async function startMonitoring() {
     const discBtn = document.getElementById('disconnect-btn');
     
     if(connBtn) connBtn.style.setProperty('display', 'none', 'important');
-    if(discBtn) discBtn.style.setProperty('inline-block', 'important');
+    if(discBtn) discBtn.style.setProperty('display', 'inline-block', 'important');
     
-    logEvent("START: Checking for recent data today...");
+    logEvent("START: Applying Linear Regression monitoring...");
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
@@ -101,14 +106,12 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            console.log(`Time Gap: ${diffInSeconds}s`);
+            console.log(`Gap: ${diffInSeconds}s | Sheet Time: ${data.timestamp}`);
 
-            // --- STRICT RECENT DATA CHECK ---
-            // Kapag lagpas 30 seconds ang tanda ng data (mula kahapon o kanina),
-            // ituturing itong OFFLINE/STALE. Hindi ito papasok sa chart.
-            if (isNaN(dataTime) || diffInSeconds > 30) { 
+            // Extended tolerance to 5 minutes para iwas "Offline" bug
+            if (isNaN(dataTime) || diffInSeconds > 300) {
                 if(syncLabel) {
-                    syncLabel.innerText = "Waiting for Recent Data...";
+                    syncLabel.innerText = "Data Stale/Offline";
                     syncLabel.style.color = "#fbbf24"; 
                 }
                 updateDashboard(0, 0, "OFFLINE");
@@ -128,8 +131,8 @@ async function fetchDataFromSheets() {
 }
 
 function updateDashboard(t, v, s) {
-    const tempVal = parseFloat(t) || 0;
-    const vibVal = parseFloat(v) || 0;
+    const tempVal = parseFloat(t);
+    const vibVal = parseFloat(v);
 
     const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
     const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
@@ -138,9 +141,8 @@ function updateDashboard(t, v, s) {
     const healthDisp = document.getElementById('motor-health-score');
     const light = document.querySelector('.status-light');
 
-    // UI reset sa 0.0 kung offline
-    if(tDisp) tDisp.innerText = (s === "OFFLINE") ? "0.0" : tempVal.toFixed(1);
-    if(vDisp) vDisp.innerText = (s === "OFFLINE") ? "0.00" : vibVal.toFixed(2);
+    if(tDisp) tDisp.innerText = tempVal.toFixed(1);
+    if(vDisp) vDisp.innerText = vibVal.toFixed(2);
 
     if (isMonitoring && s !== "OFFLINE" && (tempVal !== 0 || vibVal !== 0)) {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
@@ -148,6 +150,7 @@ function updateDashboard(t, v, s) {
         myChart.data.datasets[0].data.push(tempVal);
         myChart.data.datasets[1].data.push(vibVal);
         
+        // Sliding window for regression (limit to 15 points)
         if (myChart.data.labels.length > 15) {
             myChart.data.labels.shift();
             myChart.data.datasets.forEach(d => d.data.shift());
@@ -155,9 +158,10 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // Linear Regression part
+    // --- LINEAR REGRESSION ANALYSIS ---
     const tempArray = myChart.data.datasets[0].data;
     const vibArray = myChart.data.datasets[1].data;
+    
     const tempSlope = calculateSlope(tempArray.slice(-10));
     const vibSlope = calculateSlope(vibArray.slice(-10));
 
@@ -170,21 +174,31 @@ function updateDashboard(t, v, s) {
         currentStatus = "DISCONNECTED";
         statusClass = "status-idle";
         healthAssessment = "OFFLINE";
-        actionText = "No recent data detected. Connect hardware to start.";
+        actionText = "Dashboard paused. Connect to resume data feed.";
     } 
+    // 1. Regression Alert (Rising Fast)
     else if (tempVal >= 85 && tempSlope > 0.5) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast (+${tempSlope.toFixed(2)}°/sample).`;
+        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast, monitor for possible burning (+${tempSlope.toFixed(2)}°/sample).`;
     } 
+    // 2. High Temp but Stable (Slope is near zero)
     else if (tempVal >= 85 && Math.abs(tempSlope) <= 0.1) {
         currentStatus = "HIGH TEMP STABLE";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        actionText = `⚠️ <b>NOTICE:</b> Motor is hot but stable.`;
+        actionText = `⚠️ <b>NOTICE:</b> Motor is hot but temperature has stabilized (Slope: ${tempSlope.toFixed(2)}).`;
+    }
+    // 3. Vibration Trend
+    else if (vibSlope > 0.2) {
+        currentStatus = "VIB INCREASE";
+        statusClass = "status-warning";
+        healthAssessment = "DEGRADED";
+        actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment.`;
     }
 
+    // --- UI UPDATES ---
     if(statLabel) {
         statLabel.innerText = currentStatus;
         statLabel.className = "status-text " + statusClass;
@@ -200,13 +214,6 @@ function updateDashboard(t, v, s) {
 function stopMonitoring() {
     isMonitoring = false;
     clearInterval(fetchInterval);
-    
-    // Force reset displays to zero
-    const tDisp = document.getElementById('temp-val') || document.getElementById('temp-display');
-    const vDisp = document.getElementById('vib-val') || document.getElementById('vib-display');
-    if(tDisp) tDisp.innerText = "0.0";
-    if(vDisp) vDisp.innerText = "0.00";
-
     updateDashboard(0, 0, "OFFLINE");
     myChart.data.labels = [];
     myChart.data.datasets.forEach(d => d.data = []);
@@ -217,7 +224,7 @@ function stopMonitoring() {
     if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
 
-    logEvent("PAUSED: Dashboard cleared.");
+    logEvent("PAUSED: Monitoring stopped.");
 }
 
 function logEvent(msg, type = "") {
