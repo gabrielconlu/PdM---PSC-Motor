@@ -134,7 +134,7 @@ function updateDashboard(t, v, s) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast (+${tempSlope.toFixed(2)}°/sample). <b>Shutdown advised</b> before reaching 95°C.`;
+        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast, monitor for possible burning (+${tempSlope.toFixed(2)}°/sample).`;
     } 
     else if (tempVal >= 85 && Math.abs(tempSlope) <= 0.1) {
         currentStatus = "HIGH TEMP STABLE";
