@@ -3,6 +3,9 @@ const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnn
 let myChart;
 let fetchInterval;
 
+// Idagdag ang flag na ito para malaman kung active ang monitoring
+let isMonitoring = false;
+
 window.addEventListener('DOMContentLoaded', (event) => {
     logEvent("SYSTEM READY: Initializing dashboard...");
     initChart();
@@ -40,14 +43,15 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' } },
-                y1: { type: 'linear', position: 'right', display: false }
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' }, min: 0 },
+                y1: { type: 'linear', position: 'right', display: false, min: 0 }
             }
         }
     });
 }
 
 async function startMonitoring() {
+    isMonitoring = true; // Set to true
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
     
@@ -60,6 +64,8 @@ async function startMonitoring() {
 }
 
 async function fetchDataFromSheets() {
+    if (!isMonitoring) return; // Wag kukuha ng data kung disconnected
+
     try {
         const syncLabel = document.getElementById('sync-status');
         if(syncLabel) {
@@ -75,6 +81,7 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
+            // Kung lumang data (more than 60 seconds ago), i-zero out
             if (diffInSeconds > 60) {
                 if(syncLabel) {
                     syncLabel.innerText = "No Recent Data";
@@ -93,11 +100,7 @@ async function fetchDataFromSheets() {
         }
     } catch (e) {
         logEvent("ERROR: Connection failed", "error");
-        const syncLabel = document.getElementById('sync-status');
-        if(syncLabel) {
-            syncLabel.innerText = "Offline";
-            syncLabel.style.color = "#ef4444";
-        }
+        updateDashboard(0, 0, "OFFLINE");
     }
 }
 
@@ -110,7 +113,6 @@ function updateDashboard(t, v, s) {
     const statLabel = document.getElementById('status-label');
     const aiAction = document.getElementById('ai-action-step');
     const light = document.querySelector('.status-light');
-    const motorCube = document.getElementById('motor-cube');
     const healthDisp = document.getElementById('motor-health-score');
 
     if(tDisp) tDisp.innerText = tempVal.toFixed(1);
@@ -121,77 +123,75 @@ function updateDashboard(t, v, s) {
     let healthAssessment = "OPTIMAL"; 
     let actionText = "Motor operating within predicted baseline.";
 
-    // --- CONDITION-BASED ASSESSMENT LOGIC ---
-
-    // 1. OFFLINE OR NO DATA
-    if (s === "OFFLINE" || (tempVal === 0 && vibVal === 0)) {
-        currentStatus = "NO DATA FEED";
+    if (s === "OFFLINE" || !isMonitoring || (tempVal === 0 && vibVal === 0)) {
+        currentStatus = "DISCONNECTED";
         statusClass = "status-idle";
-        healthAssessment = "UNKNOWN";
-        actionText = "Waiting for fresh sensor data from ESP32...";
+        healthAssessment = "OFFLINE";
+        actionText = "Dashboard paused. Connect to resume data feed.";
     } 
-    // 2. CRITICAL (High Failure Risk)
     else if (tempVal >= 95 || vibVal >= 4.0) {
         currentStatus = "CRITICAL FAULT";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        // AI Advice adjusted to include humming check
-        actionText = "🚨 <b>SHUTDOWN REQUIRED:</b> High risk of winding failure. <b>Check also if there is humming</b> (locked rotor).";
-        if(motorCube) motorCube.classList.add('cube-vibrate');
+        actionText = "🚨 <b>SHUTDOWN REQUIRED:</b> High risk of failure. Check for humming.";
     } 
-    // 3. DEGRADED (Stress/Warning)
     else if (tempVal >= 85 || vibVal >= 2.0) {
         currentStatus = "STRESS DETECTED";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        // AI Advice adjusted to include humming check
-        actionText = "⚠️ <b>MONITOR:</b> Increased thermal or mechanical load. <b>Check also if there is humming</b> or abnormal noise.";
-    }
-    // 4. IDLE / STABLE
-    else if (vibVal < 1.3 && tempVal < 85) {
-        currentStatus = "SYSTEM IDLE";
-        statusClass = "status-idle";
-        healthAssessment = "STABLE";
-        actionText = "No active load detected. Monitoring gravity baseline (0.96G).";
-        if(motorCube) motorCube.classList.remove('cube-vibrate');
+        actionText = "⚠️ <b>MONITOR:</b> Increased load detected. Check for humming.";
     }
 
-    // --- UI UPDATES ---
     if(statLabel) {
         statLabel.innerText = currentStatus;
         statLabel.className = "status-text " + statusClass;
     }
     if(aiAction) aiAction.innerHTML = actionText;
-
     if(healthDisp) {
         healthDisp.innerText = healthAssessment;
-        healthDisp.style.color = (healthAssessment === "OPTIMAL" || healthAssessment === "STABLE") ? "#22c55e" : 
-                                 (healthAssessment === "DEGRADED") ? "#fbbf24" : 
-                                 (healthAssessment === "DANGER") ? "#ef4444" : "#94a3b8";
+        healthDisp.style.color = (healthAssessment === "OPTIMAL") ? "#22c55e" : "#ef4444";
     }
-
     if(light) light.className = "status-light " + statusClass;
 
-    // Chart Update
-    const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
-    myChart.data.labels.push(now);
-    myChart.data.datasets[0].data.push(tempVal);
-    myChart.data.datasets[1].data.push(vibVal);
-    
-    if (myChart.data.labels.length > 15) {
-        myChart.data.labels.shift();
-        myChart.data.datasets.forEach(d => d.data.shift());
+    // Chart Update - Isama lang sa chart kung active
+    if (isMonitoring) {
+        const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
+        myChart.data.labels.push(now);
+        myChart.data.datasets[0].data.push(tempVal);
+        myChart.data.datasets[1].data.push(vibVal);
+        
+        if (myChart.data.labels.length > 15) {
+            myChart.data.labels.shift();
+            myChart.data.datasets.forEach(d => d.data.shift());
+        }
+        myChart.update('none');
     }
-    myChart.update('none');
 }
 
 function stopMonitoring() {
+    isMonitoring = false; // Stop the flag
     clearInterval(fetchInterval);
+    
+    // I-reset ang mga display sa 0
+    updateDashboard(0, 0, "OFFLINE");
+    
+    // I-clear ang chart data para malinis pag-connect ulit
+    myChart.data.labels = [];
+    myChart.data.datasets.forEach(d => d.data = []);
+    myChart.update();
+
     const connBtn = document.getElementById('connect-btn');
     const discBtn = document.getElementById('disconnect-btn');
     if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
-    logEvent("PAUSED: Sync stopped.");
+    
+    const syncLabel = document.getElementById('sync-status');
+    if(syncLabel) {
+        syncLabel.innerText = "Disconnected";
+        syncLabel.style.color = "#94a3b8";
+    }
+    
+    logEvent("PAUSED: Dashboard reset to 0.");
 }
 
 function logEvent(msg, type = "") {
