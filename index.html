@@ -8,30 +8,42 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <div class="top-controls">
+        <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">CONNECT SYSTEM</button>
+        <button id="disconnect-btn" onclick="stopMonitoring()">DISCONNECT</button>
+    </div>
+
     <div class="container">
         <div class="header">
             <h2>PSC MOTOR MONITORING</h2>
-            <div id="sync-status">Offline</div>
+            <div id="sync-status">OFFLINE</div>
         </div>
 
         <div class="metrics-grid">
             <div class="card">
-                <div id="temp-light" class="status-light"></div>
-                <div class="label">Temperature</div>
-                <div class="value"><span id="temp-display">0.0</span><span class="unit">°C</span></div>
+                <div class="status-light"></div> <div class="label">Temperature</div>
+                <div class="value">
+                    <span id="temp-display">0.0</span><span class="unit">°C</span>
+                </div>
             </div>
             <div class="card">
-                <div id="vib-light" class="status-light"></div>
-                <div class="label">Vibration (G)</div>
-                <div class="value"><span id="vib-display">0.96</span><span class="unit">G</span></div>
+                <div class="status-light"></div>
+                <div class="label">Vibration Magnitude</div>
+                <div class="value">
+                    <span id="vib-display">0.00</span><span class="unit">G</span>
+                </div>
             </div>
         </div>
 
         <div class="ai-box">
-            <div id="status-label" style="font-weight: bold; font-size: 1.1rem;">WAITING FOR DATA</div>
-            <div class="ai-subtext" id="ai-action-step">Connect to start real-time monitoring of the PSC Motor.</div>
+            <div id="status-label" class="status-text status-idle" style="font-weight: bold; font-size: 1.1rem;">
+                SYSTEM INITIALIZING
+            </div>
+            <div class="ai-subtext" id="ai-action-step">
+                Connect to start real-time monitoring of the PSC Motor.
+            </div>
             <div class="stats-row">
-                <span>Health Score: <b id="motor-health-score">--</b></span>
+                <span>Condition Assessment: <b id="motor-health-score">UNKNOWN</b></span>
             </div>
         </div>
 
@@ -39,14 +51,16 @@
             <canvas id="myChart"></canvas>
         </div>
 
-        <div class="log-box" id="system-logs">
+        <div class="log-box">
+            <div class="log-header">
+                <span>SYSTEM EVENT LOGS</span>
+                <button class="clear-btn" onclick="document.getElementById('system-logs').innerHTML=''">Clear</button>
             </div>
-
-        <div class="nav-row">
-            <button id="connect-btn" class="btn-connect" onclick="startMonitoring()">CONNECT</button>
-            <button id="disconnect-btn" class="btn-connect" style="display:none; background: #475569;" onclick="stopMonitoring()">DISCONNECT</button>
+            <div id="system-logs">
+                </div>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
