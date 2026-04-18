@@ -118,7 +118,7 @@ function updateDashboard(t, v, s) {
 
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
-    let healthAssessment = "OPTIMAL"; // Bagong Condition Assessment label
+    let healthAssessment = "OPTIMAL"; 
     let actionText = "Motor operating within predicted baseline.";
 
     // --- CONDITION-BASED ASSESSMENT LOGIC ---
@@ -135,7 +135,8 @@ function updateDashboard(t, v, s) {
         currentStatus = "CRITICAL FAULT";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        actionText = "🚨 <b>SHUTDOWN REQUIRED:</b> High risk of winding failure or bearing seizure.";
+        // AI Advice adjusted to include humming check
+        actionText = "🚨 <b>SHUTDOWN REQUIRED:</b> High risk of winding failure. <b>Check also if there is humming</b> (locked rotor).";
         if(motorCube) motorCube.classList.add('cube-vibrate');
     } 
     // 3. DEGRADED (Stress/Warning)
@@ -143,7 +144,8 @@ function updateDashboard(t, v, s) {
         currentStatus = "STRESS DETECTED";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        actionText = "⚠️ <b>MONITOR:</b> Increased thermal or mechanical load. Check for vibrations.";
+        // AI Advice adjusted to include humming check
+        actionText = "⚠️ <b>MONITOR:</b> Increased thermal or mechanical load. <b>Check also if there is humming</b> or abnormal noise.";
     }
     // 4. IDLE / STABLE
     else if (vibVal < 1.3 && tempVal < 85) {
@@ -163,7 +165,6 @@ function updateDashboard(t, v, s) {
 
     if(healthDisp) {
         healthDisp.innerText = healthAssessment;
-        // Baguhin ang kulay ng text base sa condition
         healthDisp.style.color = (healthAssessment === "OPTIMAL" || healthAssessment === "STABLE") ? "#22c55e" : 
                                  (healthAssessment === "DEGRADED") ? "#fbbf24" : 
                                  (healthAssessment === "DANGER") ? "#ef4444" : "#94a3b8";
