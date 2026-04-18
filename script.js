@@ -166,7 +166,7 @@ function updateDashboard(t, v, s) {
     else if (tempVal >= 85 && tempSlope > 0.5) {
         currentStatus = "THERMAL RUNAWAY";
         statusClass = "status-critical";
-        actionText = `🚨 <b>CRITICAL:</b> Dangerous temperature trend (+${tempSlope.toFixed(2)}°/sample). Shut down now!`;
+        actionText = `🚨 <b>CRITICAL:</b> Dangerous temperature trend (+${tempSlope.toFixed(2)}°/sample). Check for possible burning.`;
     }
 
     const statLabel = document.getElementById('status-label');
