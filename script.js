@@ -48,25 +48,10 @@ function initChart() {
     });
 }
 
-// --- LINEAR REGRESSION HELPER ---
-function calculateSlope(data) {
-    const n = data.length;
-    if (n < 2) return 0;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let i = 0; i < n; i++) {
-        sumX += i;
-        sumY += data[i];
-        sumXY += i * data[i];
-        sumX2 += i * i;
-    }
-    return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-}
-
 // --- DATE PARSING HELPER (Fixes Offline Issue) ---
 function parseSheetDate(dateStr) {
     let d = new Date(dateStr);
     if (isNaN(d.getTime())) {
-        // Manual parse para sa MM/DD/YYYY formats mula sa Sheets
         let parts = dateStr.split(/[\s,/-]+/);
         if (parts.length >= 3) {
             d = new Date(parts[2], parts[0] - 1, parts[1], parts[3] || 0, parts[4] || 0, parts[5] || 0);
@@ -83,7 +68,7 @@ async function startMonitoring() {
     if(connBtn) connBtn.style.setProperty('display', 'none', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'inline-block', 'important');
     
-    logEvent("START: Applying Linear Regression monitoring...");
+    logEvent("START: Monitoring real-time sensor data...");
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
@@ -102,10 +87,9 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // Debugging info sa Browser Console (F12)
             console.log(`Gap: ${diffInSeconds}s | Sheet: ${data.timestamp}`);
 
-            // Tolerance increased to 300s (5 minutes) para iwas false "Offline"
+            // Extended tolerance to 5 minutes
             if (isNaN(dataTime) || diffInSeconds > 300) {
                 if(syncLabel) {
                     syncLabel.innerText = "Data Stale/Offline";
@@ -124,8 +108,6 @@ async function fetchDataFromSheets() {
     } catch (e) {
         console.error("Fetch error:", e);
         logEvent("ERROR: Sync failed", "error");
-        const syncLabel = document.getElementById('sync-status');
-        if(syncLabel) syncLabel.innerText = "Offline";
     }
 }
 
@@ -143,7 +125,6 @@ function updateDashboard(t, v, s) {
     if(tDisp) tDisp.innerText = tempVal.toFixed(1);
     if(vDisp) vDisp.innerText = vibVal.toFixed(2);
 
-    // I-update lang ang chart kung hindi zero/offline ang data
     if (isMonitoring && s !== "OFFLINE" && (tempVal !== 0 || vibVal !== 0)) {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(now);
@@ -156,16 +137,11 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // --- REGRESSION ANALYSIS (Last 10 points) ---
-    const last10Temp = myChart.data.datasets[0].data.slice(-10);
-    const last10Vib = myChart.data.datasets[1].data.slice(-10);
-    const tempSlope = calculateSlope(last10Temp);
-    const vibSlope = calculateSlope(last10Vib);
-
+    // --- SIMPLE THRESHOLD LOGIC (No Regression) ---
     let currentStatus = "SYSTEM NORMAL";
     let statusClass = "status-normal";
     let healthAssessment = "OPTIMAL"; 
-    let actionText = "Motor baseline is steady.";
+    let actionText = "Motor operating within predicted baseline.";
 
     if (s === "OFFLINE" || !isMonitoring) {
         currentStatus = "DISCONNECTED";
@@ -173,23 +149,17 @@ function updateDashboard(t, v, s) {
         healthAssessment = "OFFLINE";
         actionText = "Dashboard paused. Connect to resume data feed.";
     } 
-    else if (tempVal >= 85 && tempSlope > 0.5) {
-        currentStatus = "THERMAL RUNAWAY";
+    else if (tempVal >= 90 || vibVal >= 4.0) {
+        currentStatus = "CRITICAL LIMIT";
         statusClass = "status-critical";
         healthAssessment = "DANGER";
-        actionText = `🚨 <b>REGRESSION ALERT:</b> Temp is rising fast, monitor for possible burning (+${tempSlope.toFixed(2)}°/sample).`;
+        actionText = `🚨 <b>ALERT:</b> Critical threshold exceeded. Check for burning smell or humming.`;
     } 
-    else if (tempVal >= 85 && Math.abs(tempSlope) <= 0.1) {
-        currentStatus = "HIGH TEMP STABLE";
+    else if (tempVal >= 80 || vibVal >= 2.0) {
+        currentStatus = "STRESS DETECTED";
         statusClass = "status-warning";
         healthAssessment = "DEGRADED";
-        actionText = `⚠️ <b>NOTICE:</b> Motor is hot but temperature has stabilized (Slope: ${tempSlope.toFixed(2)}). Monitor for humming.`;
-    }
-    else if (vibSlope > 0.2) {
-        currentStatus = "VIB INCREASE";
-        statusClass = "status-warning";
-        healthAssessment = "DEGRADED";
-        actionText = `⚠️ <b>TREND ALERT:</b> Vibration is trending upward. Check mechanical alignment.`;
+        actionText = `⚠️ <b>WARNING:</b> High load detected. Monitor motor temperature closely.`;
     }
 
     // --- UI UPDATES ---
@@ -218,7 +188,7 @@ function stopMonitoring() {
     if(connBtn) connBtn.style.setProperty('display', 'inline-block', 'important');
     if(discBtn) discBtn.style.setProperty('display', 'none', 'important');
 
-    logEvent("PAUSED: Regression data cleared.");
+    logEvent("PAUSED: Dashboard monitoring stopped.");
 }
 
 function logEvent(msg, type = "") {
