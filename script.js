@@ -7,7 +7,7 @@ let isMonitoring = false;
 // --- 1. INITIALIZATION ---
 window.addEventListener('load', () => {
     initChart();
-    loadLogsFromStorage(); // I-recover ang logs mula sa browser memory
+    loadLogsFromStorage();
     logEvent("SYSTEM READY: Dashboard initialized.");
 });
 
@@ -88,7 +88,7 @@ function loadLogsFromStorage() {
 async function startMonitoring() {
     isMonitoring = true;
     toggleButtons(true);
-    logEvent("MONITORING STARTED: Analyzing live sensor streams...");
+    logEvent("MONITORING STARTED: Fetching hardware data...");
     fetchDataFromSheets();
     fetchInterval = setInterval(fetchDataFromSheets, 5000);
 }
@@ -97,6 +97,7 @@ async function fetchDataFromSheets() {
     if (!isMonitoring) return;
     try {
         const syncLabel = document.getElementById('sync-status');
+        // Mapapansin mo na ginagamit natin ang 'fpga_action' na pinadala ng ESP32
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
@@ -105,14 +106,15 @@ async function fetchDataFromSheets() {
             const currentTime = new Date().getTime();
             const diffInSeconds = (currentTime - dataTime) / 1000;
 
-            // Strict Check: 30 seconds tolerance para siguradong LIVE data
+            // Offline Check (30 seconds tolerance)
             if (isNaN(dataTime) || diffInSeconds > 30) { 
-                if(syncLabel) { syncLabel.innerText = "Stale Data (Offline)"; syncLabel.style.color = "#fbbf24"; }
-                updateDashboard(0, 0, "OFFLINE");
+                if(syncLabel) { syncLabel.innerText = "Offline"; syncLabel.style.color = "#fbbf24"; }
+                updateDashboard(0, 0, "OFFLINE", "No Hardware Data");
                 return; 
             }
 
-            updateDashboard(data.temp, data.vibration || 0, data.status || "Normal");
+            // Dito kinukuha ang 'fpga_action' na galing sa sheets
+            updateDashboard(data.temp, data.vibration, "LIVE", data.fpga_action || "Normal");
             if(syncLabel) { syncLabel.innerText = "Live"; syncLabel.style.color = "#22c55e"; }
         }
     } catch (e) {
@@ -120,17 +122,17 @@ async function fetchDataFromSheets() {
     }
 }
 
-// --- 4. PREDICTIVE ANALYSIS & UI ---
-function updateDashboard(t, v, s) {
+// --- 4. DASHBOARD UPDATE (HARDWARE-BASED) ---
+function updateDashboard(t, v, connectionStatus, hardwareAction) {
     const tempVal = parseFloat(t) || 0;
     const vibVal = parseFloat(v) || 0;
 
     // Update Numerical Displays
-    updateTextElement('temp-val', tempVal.toFixed(1), s);
-    updateTextElement('vib-val', vibVal.toFixed(2), s);
+    updateTextElement('temp-val', tempVal.toFixed(1), connectionStatus);
+    updateTextElement('vib-val', vibVal.toFixed(2), connectionStatus);
 
     // Update Chart
-    if (isMonitoring && s !== "OFFLINE" && (tempVal !== 0 || vibVal !== 0)) {
+    if (isMonitoring && connectionStatus !== "OFFLINE") {
         const now = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(now);
         myChart.data.datasets[0].data.push(tempVal);
@@ -143,51 +145,36 @@ function updateDashboard(t, v, s) {
         myChart.update('none');
     }
 
-    // --- LINEAR REGRESSION LOGIC ---
-    const tempSlope = calculateSlope(myChart.data.datasets[0].data.slice(-10));
-    const vibSlope = calculateSlope(myChart.data.datasets[1].data.slice(-10));
-    
-    let currentStatus = "SYSTEM NORMAL";
+    // --- HARDWARE-DRIVEN LOGIC ---
+    let currentStatusText = hardwareAction.toUpperCase();
     let statusClass = "status-normal";
-    let actionText = "Motor operating within predicted baseline.";
+    let actionStep = "System operating within normal parameters.";
 
-    if (s === "OFFLINE") {
-        currentStatus = "DISCONNECTED";
+    if (connectionStatus === "OFFLINE") {
+        currentStatusText = "DISCONNECTED";
         statusClass = "status-idle";
-        actionText = "No recent data detected. Check hardware connection.";
+        actionStep = "Check ESP32 and FPGA power/connection.";
     } 
-    // CAPACITOR FAULT LOGIC: High Vib Trend + Rapid Temp Rise
-    else if (vibSlope > 0.15 && tempSlope > 0.4) {
-        currentStatus = "POTENTIAL CAPACITOR FAULT";
-        statusClass = "status-warning";
-        actionText = `⚠️ <b>PREDICTIVE ALERT:</b> Unstable vibration + rising temp. Possible capacitor failure (No burning smell).`;
-    }
-    // THERMAL RUNAWAY LOGIC: Extreme Slope
-    else if (tempVal >= 85 && tempSlope > 0.5) {
-        currentStatus = "THERMAL RUNAWAY";
+    else if (hardwareAction.includes("VENTILATION") || hardwareAction.includes("CRITICAL")) {
         statusClass = "status-critical";
-        actionText = `🚨 <b>CRITICAL:</b> Dangerous temperature trend (+${tempSlope.toFixed(2)}°/sample). Check for possible burning.`;
+        actionStep = `🚨 <b>HARDWARE ALERT:</b> ${hardwareAction}. Inspect motor immediately.`;
+    }
+    else if (hardwareAction.includes("WARNING") || hardwareAction.includes("BLOCKAGE")) {
+        statusClass = "status-warning";
+        actionStep = `⚠️ <b>SYSTEM WARNING:</b> Abnormal trend detected by FPGA.`;
     }
 
     const statLabel = document.getElementById('status-label');
     const aiAction = document.getElementById('ai-action-step');
-    if(statLabel) { statLabel.innerText = currentStatus; statLabel.className = "status-text " + statusClass; }
-    if(aiAction) aiAction.innerHTML = actionText;
+    
+    if(statLabel) { 
+        statLabel.innerText = currentStatusText; 
+        statLabel.className = "status-text " + statusClass; 
+    }
+    if(aiAction) aiAction.innerHTML = actionStep;
 }
 
 // --- 5. HELPERS ---
-function calculateSlope(data) {
-    if (!data || data.length < 3) return 0; 
-    const n = data.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let i = 0; i < n; i++) {
-        sumX += i; sumY += data[i];
-        sumXY += i * data[i]; sumX2 += i * i;
-    }
-    const den = (n * sumX2 - sumX * sumX);
-    return den === 0 ? 0 : (n * sumXY - sumX * sumY) / den;
-}
-
 function parseSheetDate(dateStr) {
     let d = new Date(dateStr);
     if (isNaN(d.getTime())) {
@@ -212,7 +199,7 @@ function updateTextElement(id, val, status) {
 function stopMonitoring() {
     isMonitoring = false;
     clearInterval(fetchInterval);
-    updateDashboard(0, 0, "OFFLINE");
+    updateDashboard(0, 0, "OFFLINE", "Disconnected");
     logEvent("PAUSED: Monitoring stopped.");
     toggleButtons(false);
 }
