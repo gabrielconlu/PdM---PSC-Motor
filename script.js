@@ -8,7 +8,7 @@ let isMonitoring = false;
 window.addEventListener('load', () => {
     initChart();
     loadLogsFromStorage();
-    logEvent("SYSTEM READY: Dashboard initialized.");
+    logEvent("SYSTEM READY: Hardware-Driven Dashboard initialized.");
 });
 
 function initChart() {
@@ -97,7 +97,6 @@ async function fetchDataFromSheets() {
     if (!isMonitoring) return;
     try {
         const syncLabel = document.getElementById('sync-status');
-        // Mapapansin mo na ginagamit natin ang 'fpga_action' na pinadala ng ESP32
         const response = await fetch(`${url}?read=true&t=${new Date().getTime()}`);
         const data = await response.json();
 
@@ -113,7 +112,7 @@ async function fetchDataFromSheets() {
                 return; 
             }
 
-            // Dito kinukuha ang 'fpga_action' na galing sa sheets
+            // Gamit ang 'fpga_action' na nanggaling sa Verilog hardware classification
             updateDashboard(data.temp, data.vibration, "LIVE", data.fpga_action || "Normal");
             if(syncLabel) { syncLabel.innerText = "Live"; syncLabel.style.color = "#22c55e"; }
         }
@@ -122,7 +121,7 @@ async function fetchDataFromSheets() {
     }
 }
 
-// --- 4. DASHBOARD UPDATE (HARDWARE-BASED) ---
+// --- 4. DASHBOARD UPDATE (PURE HARDWARE-BASED) ---
 function updateDashboard(t, v, connectionStatus, hardwareAction) {
     const tempVal = parseFloat(t) || 0;
     const vibVal = parseFloat(v) || 0;
@@ -145,7 +144,7 @@ function updateDashboard(t, v, connectionStatus, hardwareAction) {
         myChart.update('none');
     }
 
-    // --- HARDWARE-DRIVEN LOGIC ---
+    // --- LOGIC MAPPING: VERILOG RESPONSE -> UI UI ---
     let currentStatusText = hardwareAction.toUpperCase();
     let statusClass = "status-normal";
     let actionStep = "System operating within normal parameters.";
@@ -155,13 +154,16 @@ function updateDashboard(t, v, connectionStatus, hardwareAction) {
         statusClass = "status-idle";
         actionStep = "Check ESP32 and FPGA power/connection.";
     } 
-    else if (hardwareAction.includes("VENTILATION") || hardwareAction.includes("CRITICAL")) {
+    // Dito binabasa ang string classification na ipinadala ng ESP32 mula sa FPGA codes
+    else if (hardwareAction.includes("CRITICAL") || hardwareAction.includes("VENTILATION")) {
         statusClass = "status-critical";
-        actionStep = `🚨 <b>HARDWARE ALERT:</b> ${hardwareAction}. Inspect motor immediately.`;
+        actionStep = `🚨 <b>HARDWARE ALERT:</b> FPGA detected ${hardwareAction}. Inspect motor immediately.`;
+        logEvent(`ALERT: ${hardwareAction}`, "error");
     }
-    else if (hardwareAction.includes("WARNING") || hardwareAction.includes("BLOCKAGE")) {
+    else if (hardwareAction.includes("HIGH") || hardwareAction.includes("WARNING")) {
         statusClass = "status-warning";
-        actionStep = `⚠️ <b>SYSTEM WARNING:</b> Abnormal trend detected by FPGA.`;
+        actionStep = `⚠️ <b>SYSTEM WARNING:</b> ${hardwareAction} threshold reached.`;
+        logEvent(`WARNING: ${hardwareAction}`);
     }
 
     const statLabel = document.getElementById('status-label');
