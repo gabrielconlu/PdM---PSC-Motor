@@ -4,7 +4,6 @@ let myChart;
 let fetchInterval;
 let isMonitoring = false;
 
-// 🔒 SYNC CONTROL
 let isFetching = false;
 const FETCH_INTERVAL_MS = 5000;
 
@@ -48,6 +47,7 @@ function initChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             scales: {
                 y: { position: 'left', min: 0 },
                 y1: { position: 'right', min: 0 }
@@ -61,7 +61,7 @@ function logEvent(msg, type = "") {
     const entry = {
         time: new Date().toLocaleTimeString(),
         message: msg,
-        type: type
+        type
     };
 
     const list = document.getElementById('event-list');
@@ -98,21 +98,27 @@ function startMonitoring() {
     fetchInterval = setInterval(fetchDataFromSheets, FETCH_INTERVAL_MS);
 }
 
-// ================= FETCH (FULLY STABLE) =================
+// ================= FETCH (FIXED STABLE VERSION) =================
 async function fetchDataFromSheets() {
 
     if (!isMonitoring || isFetching) return;
     isFetching = true;
 
     try {
-        const response = await fetch(`${url}?t=${Date.now()}`);
-        const text = await response.text();
 
         const syncLabel = document.getElementById('sync-status');
 
-        console.log("RAW:", text);
+        // 🔥 FORCE NO CACHE (VERY IMPORTANT FIX)
+        const response = await fetch(
+            `${url}?read=true&t=${Date.now()}&nocache=${Math.random()}`,
+            { cache: "no-store" }
+        );
 
-        // ❌ HARD FAIL CASES
+        const text = await response.text();
+
+        console.log("RAW RESPONSE:", text);
+
+        // ================= HARD ERROR CHECK =================
         if (!text || text.includes("ERROR") || text.includes("NO_")) {
 
             if (syncLabel) {
@@ -124,13 +130,13 @@ async function fetchDataFromSheets() {
             return;
         }
 
-        // ❌ NOT JSON (safe fallback)
-        let data = null;
+        let data;
 
         try {
             data = JSON.parse(text);
         } catch (e) {
-            // if not JSON, treat as OK text response
+
+            // fallback if plain "OK"
             if (text.trim() === "OK") {
 
                 if (syncLabel) {
@@ -138,25 +144,45 @@ async function fetchDataFromSheets() {
                     syncLabel.style.color = "#22c55e";
                 }
 
-                logEvent("SYNC OK");
                 return;
             }
 
-            throw new Error("Invalid response: " + text);
+            throw new Error("Invalid JSON: " + text);
         }
 
-        // ================= VALID JSON DATA =================
-        updateDashboard(
-            data.temp || 0,
-            data.vibration || 0,
-            "LIVE",
-            (data.tempStatus || "") + "|" + (data.vibStatus || "")
-        );
+        // ================= VALID DATA =================
+        const temp = parseFloat(data.temp) || 0;
+        const vib = parseFloat(data.vibration) || 0;
 
+        const status =
+            (data.tempStatus || "unknown") + "|" +
+            (data.vibStatus || "unknown");
+
+        updateDashboard(temp, vib, "LIVE", status);
+
+        // ================= SYNC STATUS =================
         if (syncLabel) {
             syncLabel.innerText = "Live";
             syncLabel.style.color = "#22c55e";
         }
+
+        // ================= FORCE CHART UPDATE EVERY FETCH =================
+        const now = new Date().toLocaleTimeString([], {
+            hour12: false,
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        myChart.data.labels.push(now);
+        myChart.data.datasets[0].data.push(temp);
+        myChart.data.datasets[1].data.push(vib);
+
+        if (myChart.data.labels.length > 20) {
+            myChart.data.labels.shift();
+            myChart.data.datasets.forEach(d => d.data.shift());
+        }
+
+        myChart.update('none');
 
     } catch (e) {
 
@@ -178,31 +204,8 @@ async function fetchDataFromSheets() {
 // ================= DASHBOARD =================
 function updateDashboard(temp, vib, status, action) {
 
-    const t = parseFloat(temp) || 0;
-    const v = parseFloat(vib) || 0;
-
-    document.getElementById("temp-val").innerText = t.toFixed(1);
-    document.getElementById("vib-val").innerText = v.toFixed(3);
-
-    if (isMonitoring && status !== "OFFLINE") {
-
-        const now = new Date().toLocaleTimeString([], {
-            hour12: false,
-            minute: '2-digit',
-            second: '2-digit'
-        });
-
-        myChart.data.labels.push(now);
-        myChart.data.datasets[0].data.push(t);
-        myChart.data.datasets[1].data.push(v);
-
-        if (myChart.data.labels.length > 15) {
-            myChart.data.labels.shift();
-            myChart.data.datasets.forEach(d => d.data.shift());
-        }
-
-        myChart.update('none');
-    }
+    document.getElementById("temp-val").innerText = temp.toFixed(1);
+    document.getElementById("vib-val").innerText = vib.toFixed(3);
 
     document.getElementById("status-label").innerText = action;
     document.getElementById("ai-action-step").innerText = action;
@@ -223,5 +226,6 @@ function stopMonitoring() {
 
     updateDashboard(0, 0, "OFFLINE", "Stopped");
     logEvent("MONITORING STOPPED");
+
     toggleButtons(false);
 }
