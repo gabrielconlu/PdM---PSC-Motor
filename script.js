@@ -8,35 +8,13 @@ const FETCH_INTERVAL_MS = 3000;
 
 // ================= AUTO START =================
 window.addEventListener("load", () => {
-
-    setTimeout(() => {
-        initChart();
-        startAutoMonitoring();
-    }, 300);
-
+    initChart();
+    startAutoFetch();
 });
-
-// ================= AUTO MONITORING =================
-function startAutoMonitoring() {
-
-    console.log("AUTO MONITORING STARTED");
-
-    fetchData();
-
-    fetchInterval = setInterval(fetchData, FETCH_INTERVAL_MS);
-}
 
 // ================= CHART =================
 function initChart() {
-
-    const canvas = document.getElementById("myChart");
-
-    if (!canvas) {
-        console.error("Canvas not found");
-        return;
-    }
-
-    const ctx = canvas.getContext("2d");
+    const ctx = document.getElementById("myChart").getContext("2d");
 
     myChart = new Chart(ctx, {
         type: "line",
@@ -44,85 +22,118 @@ function initChart() {
             labels: [],
             datasets: [
                 {
-                    label: "Temperature",
+                    label: "Temperature (°C)",
                     data: [],
-                    borderColor: "red",
+                    borderColor: "#ef4444",
+                    borderWidth: 2,
                     tension: 0.3
                 },
                 {
-                    label: "Vibration (x1000)",
+                    label: "Vibration (G)",
                     data: [],
-                    borderColor: "green",
+                    borderColor: "#22c55e",
+                    borderWidth: 2,
                     tension: 0.3
                 }
             ]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                y: { beginAtZero: true },
+                x: { display: true }
+            }
         }
     });
-
-    console.log("CHART READY");
 }
 
-// ================= FETCH LOOP =================
-async function fetchData() {
+// ================= AUTO FETCH =================
+function startAutoFetch() {
+
+    if (fetchInterval) clearInterval(fetchInterval);
+
+    fetchLatestData(); // immediate first fetch
+
+    fetchInterval = setInterval(fetchLatestData, FETCH_INTERVAL_MS);
+}
+
+// ================= FETCH DATA =================
+async function fetchLatestData() {
 
     if (isFetching) return;
     isFetching = true;
 
     try {
+        const response = await fetch(url + "?read=true&t=" + Date.now());
+        const text = await response.text();
 
-        const res = await fetch(url + "?t=" + Date.now());
-        const text = await res.text();
+        console.log("RAW:", text);
 
-        console.log("RESPONSE:", text);
+        // ❌ ignore non-data responses
+        if (!text || text.includes("ERROR") || text.includes("MISSING")) {
+            updateStatus("ERROR", "#ef4444");
+            return;
+        }
 
-        // We DON'T rely on response for data (Apps Script = OK only)
+        // ================= TRY PARSE JSON =================
+        let data;
 
-        const temp = parseFloat(document.getElementById("temp-val")?.innerText || 0);
-        const vib = parseFloat(document.getElementById("vib-val")?.innerText || 0);
+        try {
+            data = JSON.parse(text);
+        } catch {
+            // fallback if Apps Script returns row text
+            console.warn("Not JSON, skipping parse");
+            return;
+        }
 
-        updateChart(temp, vib);
+        if (!data) return;
 
-        document.getElementById("sync-status").innerText = "Live";
+        // ================= PARSE VALUES =================
+        const temp = parseFloat(data.temp) || 0;
+        const vib = parseFloat(data.vibration) || 0;
+
+        // ================= FIX FLOAT DISPLAY =================
+        document.getElementById("temp-display").innerText = temp.toFixed(1);
+        document.getElementById("vib-display").innerText = vib.toFixed(3);
+
+        updateStatus("LIVE", "#22c55e");
+
+        // ================= UPDATE CHART =================
+        const time = new Date().toLocaleTimeString();
+
+        myChart.data.labels.push(time);
+        myChart.data.datasets[0].data.push(temp);
+        myChart.data.datasets[1].data.push(vib);
+
+        if (myChart.data.labels.length > 20) {
+            myChart.data.labels.shift();
+            myChart.data.datasets.forEach(d => d.data.shift());
+        }
+
+        myChart.update();
+
+        // ================= STATUS =================
+        document.getElementById("status-label").innerText =
+            data.fpga_action || "NORMAL OPERATION";
+
+        document.getElementById("ai-action-step").innerText =
+            "System running with real-time sensor feed.";
 
     } catch (err) {
-
         console.error(err);
-
-        document.getElementById("sync-status").innerText = "Offline";
-
-    } finally {
-        isFetching = false;
-    }
-}
-
-// ================= UPDATE CHART =================
-function updateChart(temp, vib) {
-
-    if (!myChart) return;
-
-    const vibScaled = vib * 1000;
-    const time = new Date().toLocaleTimeString();
-
-    myChart.data.labels.push(time);
-    myChart.data.datasets[0].data.push(temp);
-    myChart.data.datasets[1].data.push(vibScaled);
-
-    if (myChart.data.labels.length > 20) {
-        myChart.data.labels.shift();
-        myChart.data.datasets.forEach(d => d.data.shift());
+        updateStatus("OFFLINE", "#ef4444");
     }
 
-    myChart.update("none");
+    isFetching = false;
 }
 
-// ================= OPTIONAL STOP =================
-function stopMonitoring() {
+// ================= STATUS UI =================
+function updateStatus(text, color) {
+    const el = document.getElementById("sync-status");
+    if (!el) return;
 
-    clearInterval(fetchInterval);
-
-    console.log("MONITORING STOPPED");
+    el.innerText = text;
+    el.style.color = color;
 }
