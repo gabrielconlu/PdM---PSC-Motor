@@ -4,18 +4,17 @@ let myChart;
 let fetchInterval;
 let isMonitoring = false;
 
-// 🔒 SYNC CONTROL FLAGS
 let isFetching = false;
-let lastFetchTime = 0;
-const FETCH_INTERVAL_MS = 5000;
+const FETCH_INTERVAL_MS = 3000; // stable sync interval
 
-// --- 1. INITIALIZATION ---
+// ================= INIT =================
 window.addEventListener('load', () => {
     initChart();
     loadLogsFromStorage();
-    logEvent("SYSTEM READY: Hardware-Driven Dashboard initialized.");
+    logEvent("SYSTEM READY: Dashboard initialized.");
 });
 
+// ================= CHART =================
 function initChart() {
     const canvas = document.getElementById('myChart');
     if (!canvas) return;
@@ -28,7 +27,7 @@ function initChart() {
             labels: [],
             datasets: [
                 {
-                    label: 'Temp (°C)',
+                    label: 'Temperature (°C)',
                     data: [],
                     borderColor: '#ef4444',
                     backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -49,6 +48,7 @@ function initChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // 🔥 prevents lag + sync issues
             scales: {
                 y: {
                     type: 'linear',
@@ -59,8 +59,7 @@ function initChart() {
                 y1: {
                     type: 'linear',
                     position: 'right',
-                    display: true,
-                    title: { display: true, text: 'Vib (G)' },
+                    title: { display: true, text: 'Vibration (G)' },
                     min: 0
                 }
             }
@@ -68,29 +67,29 @@ function initChart() {
     });
 }
 
-// --- 2. LOGGING SYSTEM ---
+// ================= LOG SYSTEM =================
 function logEvent(msg, type = "") {
-    const entryData = {
+    const entry = {
         time: new Date().toLocaleTimeString(),
         message: msg,
         type: type
     };
 
-    renderLogEntry(entryData);
-    saveLogToStorage(entryData);
+    renderLogEntry(entry);
+    saveLogToStorage(entry);
 }
 
 function renderLogEntry(log) {
     const list = document.getElementById('event-list') || document.getElementById('system-logs');
     if (!list) return;
 
-    const entry = document.createElement('div');
-    entry.className = "log-entry";
+    const div = document.createElement('div');
+    div.className = "log-entry";
 
-    if (log.type === "error") entry.style.color = "#ef4444";
+    if (log.type === "error") div.style.color = "#ef4444";
 
-    entry.innerHTML = `<span class="log-time">[${log.time}]</span> ${log.message}`;
-    list.prepend(entry);
+    div.innerHTML = `[${log.time}] ${log.message}`;
+    list.prepend(div);
 }
 
 function saveLogToStorage(log) {
@@ -103,80 +102,82 @@ function saveLogToStorage(log) {
 }
 
 function loadLogsFromStorage() {
-    const logs = JSON.parse(localStorage.getItem('motor_logs')) || [];
-    logs.forEach(log => renderLogEntry(log));
+    let logs = JSON.parse(localStorage.getItem('motor_logs')) || [];
+    logs.forEach(renderLogEntry);
 }
 
-// --- 3. START MONITORING (SYNC SAFE) ---
+// ================= START =================
 async function startMonitoring() {
+
     if (fetchInterval) clearInterval(fetchInterval);
 
     isMonitoring = true;
     toggleButtons(true);
 
-    logEvent("MONITORING STARTED: Fetching hardware data...");
+    logEvent("MONITORING STARTED");
 
-    await fetchDataFromSheets(); // immediate sync
+    await fetchData(); // immediate fetch
 
     fetchInterval = setInterval(() => {
-        fetchDataFromSheets();
+        fetchData();
     }, FETCH_INTERVAL_MS);
 }
 
-// --- 4. DATA ACQUISITION (SYNC LOCKED) ---
-async function fetchDataFromSheets() {
-    if (!isMonitoring) return;
+// ================= FETCH (SYNC SAFE) =================
+async function fetchData() {
 
-    // prevent overlapping requests
-    if (isFetching) return;
+    if (!isMonitoring || isFetching) return;
     isFetching = true;
 
     try {
+
         const syncLabel = document.getElementById('sync-status');
 
         const response = await fetch(`${url}?read=true&t=${Date.now()}`);
         const data = await response.json();
 
         if (!data || !data.timestamp) {
-            throw new Error("Invalid data received");
+            throw new Error("Invalid response");
         }
 
-        const dataTime = parseSheetDate(data.timestamp).getTime();
-        const currentTime = Date.now();
-        const diffInSeconds = (currentTime - dataTime) / 1000;
+        const temp = parseFloat(data.temp) || 0;
+        const vib = parseFloat(data.vibration) || 0;
 
-        // OFFLINE CONDITION
-        if (isNaN(dataTime) || diffInSeconds > 30) {
+        const timeDiff = Date.now() - new Date(data.timestamp).getTime();
+
+        // ================= OFFLINE =================
+        if (timeDiff > 30000) {
+
             if (syncLabel) {
                 syncLabel.innerText = "Offline";
                 syncLabel.style.color = "#fbbf24";
             }
 
-            updateDashboard(0, 0, "OFFLINE", "No Hardware Data");
+            updateDashboard(0, 0, "OFFLINE", "No Signal");
             return;
         }
 
-        // LIVE STATUS
+        // ================= LIVE =================
         if (syncLabel) {
             syncLabel.innerText = "Live";
             syncLabel.style.color = "#22c55e";
         }
 
         updateDashboard(
-            data.temp,
-            data.vibration,
+            temp,
+            vib,
             "LIVE",
-            data.fpga_action || "Normal"
+            data.fpga_action || "NORMAL"
         );
 
-        lastFetchTime = currentTime;
+    } catch (err) {
 
-    } catch (e) {
-        logEvent("ERROR: Sync failed", "error");
+        console.log(err);
+        logEvent("SYNC ERROR", "error");
 
         const syncLabel = document.getElementById('sync-status');
         if (syncLabel) {
-            syncLabel.innerText = "Sync Error";
+            syncLabel.innerText = "Error";
             syncLabel.style.color = "#ef4444";
         }
 
@@ -185,27 +186,28 @@ async function fetchDataFromSheets() {
     }
 }
 
-// --- 5. DASHBOARD UPDATE (FPGA-BASED LOGIC) ---
-function updateDashboard(t, v, connectionStatus, hardwareAction) {
-    const tempVal = parseFloat(t) || 0;
-    const vibVal = parseFloat(v) || 0;
+// ================= DASHBOARD =================
+function updateDashboard(t, v, status, action) {
 
-    updateTextElement('temp-val', tempVal.toFixed(1), connectionStatus);
-    updateTextElement('vib-val', vibVal.toFixed(2), connectionStatus);
+    const temp = Number(t) || 0;
+    const vib = Number(v) || 0;
 
-    // CHART UPDATE
-    if (isMonitoring && connectionStatus !== "OFFLINE") {
-        const now = new Date().toLocaleTimeString([], {
-            hour12: false,
-            minute: '2-digit',
-            second: '2-digit'
-        });
+    document.getElementById('temp-val').innerText =
+        status === "OFFLINE" ? "0.0" : temp.toFixed(1);
+
+    document.getElementById('vib-val').innerText =
+        status === "OFFLINE" ? "0.00" : vib.toFixed(2);
+
+    // ================= CHART =================
+    if (isMonitoring && status !== "OFFLINE") {
+
+        const now = new Date().toLocaleTimeString();
 
         myChart.data.labels.push(now);
-        myChart.data.datasets[0].data.push(tempVal);
-        myChart.data.datasets[1].data.push(vibVal);
+        myChart.data.datasets[0].data.push(temp);
+        myChart.data.datasets[1].data.push(vib);
 
-        if (myChart.data.labels.length > 15) {
+        if (myChart.data.labels.length > 20) {
             myChart.data.labels.shift();
             myChart.data.datasets.forEach(d => d.data.shift());
         }
@@ -213,77 +215,40 @@ function updateDashboard(t, v, connectionStatus, hardwareAction) {
         myChart.update('none');
     }
 
-    // STATUS LOGIC (FPGA OUTPUT)
-    let currentStatusText = hardwareAction.toUpperCase();
-    let statusClass = "status-normal";
-    let actionStep = "System operating within normal parameters.";
+    // ================= STATUS =================
+    const statusLabel = document.getElementById('status-label');
+    const actionBox = document.getElementById('ai-action-step');
 
-    if (connectionStatus === "OFFLINE") {
-        currentStatusText = "DISCONNECTED";
-        statusClass = "status-idle";
-        actionStep = "Check ESP32 and FPGA connection.";
-    }
-    else if (hardwareAction.includes("CRITICAL") || hardwareAction.includes("VENTILATION")) {
-        statusClass = "status-critical";
-        actionStep = `🚨 FPGA ALERT: ${hardwareAction}. Immediate inspection required.`;
-        logEvent(`CRITICAL: ${hardwareAction}`, "error");
-    }
-    else if (hardwareAction.includes("HIGH") || hardwareAction.includes("WARNING")) {
-        statusClass = "status-warning";
-        actionStep = `⚠️ WARNING: ${hardwareAction}`;
-        logEvent(`WARNING: ${hardwareAction}`);
+    if (statusLabel) {
+        statusLabel.innerText = action;
+        statusLabel.className = "status-text";
     }
 
-    const statLabel = document.getElementById('status-label');
-    const aiAction = document.getElementById('ai-action-step');
-
-    if (statLabel) {
-        statLabel.innerText = currentStatusText;
-        statLabel.className = "status-text " + statusClass;
+    if (actionBox) {
+        actionBox.innerHTML = action;
     }
-
-    if (aiAction) aiAction.innerHTML = actionStep;
 }
 
-// --- 6. HELPERS ---
-function parseSheetDate(dateStr) {
-    let d = new Date(dateStr);
-
-    if (isNaN(d.getTime())) {
-        let parts = dateStr.split(/[\s,/-]+/);
-        if (parts.length >= 3) {
-            d = new Date(parts[2], parts[0] - 1, parts[1], parts[3] || 0, parts[4] || 0, parts[5] || 0);
-        }
-    }
-
-    return d;
-}
-
-function toggleButtons(monitoring) {
-    const connBtn = document.getElementById('connect-btn');
-    const discBtn = document.getElementById('disconnect-btn');
-
-    if (connBtn) connBtn.style.display = monitoring ? 'none' : 'inline-block';
-    if (discBtn) discBtn.style.display = monitoring ? 'inline-block' : 'none';
-}
-
-function updateTextElement(id, val, status) {
-    const el = document.getElementById(id);
-    if (el) el.innerText = (status === "OFFLINE") ? "0.0" : val;
-}
-
-// --- 7. STOP MONITORING ---
+// ================= STOP =================
 function stopMonitoring() {
+
     isMonitoring = false;
 
-    if (fetchInterval) {
-        clearInterval(fetchInterval);
-        fetchInterval = null;
-    }
+    if (fetchInterval) clearInterval(fetchInterval);
 
     isFetching = false;
 
-    updateDashboard(0, 0, "OFFLINE", "Disconnected");
-    logEvent("PAUSED: Monitoring stopped.");
+    updateDashboard(0, 0, "OFFLINE", "STOPPED");
+    logEvent("MONITORING STOPPED");
+
     toggleButtons(false);
+}
+
+// ================= UI =================
+function toggleButtons(state) {
+    const startBtn = document.getElementById('connect-btn');
+    const stopBtn = document.getElementById('disconnect-btn');
+
+    if (startBtn) startBtn.style.display = state ? "none" : "inline-block";
+    if (stopBtn) stopBtn.style.display = state ? "inline-block" : "none";
 }
