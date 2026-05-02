@@ -1,33 +1,40 @@
 const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
 
 let myChart;
-let fetchInterval = null;
-let isMonitoring = false;
+let fetchInterval;
 let isFetching = false;
 
 const FETCH_INTERVAL_MS = 3000;
 
-// ================= INIT =================
+// ================= AUTO START =================
 window.addEventListener("load", () => {
 
-    initChart();
-    loadLogsFromStorage();
+    setTimeout(() => {
+        initChart();
+        startAutoMonitoring();
+    }, 300);
 
-    logEvent("SYSTEM READY");
-
-    // 🔥 FIX BUTTON BINDING (CRITICAL)
-    const connectBtn = document.getElementById("connect-btn");
-    const disconnectBtn = document.getElementById("disconnect-btn");
-
-    if (connectBtn) connectBtn.addEventListener("click", startMonitoring);
-    if (disconnectBtn) disconnectBtn.addEventListener("click", stopMonitoring);
 });
+
+// ================= AUTO MONITORING =================
+function startAutoMonitoring() {
+
+    console.log("AUTO MONITORING STARTED");
+
+    fetchData();
+
+    fetchInterval = setInterval(fetchData, FETCH_INTERVAL_MS);
+}
 
 // ================= CHART =================
 function initChart() {
 
     const canvas = document.getElementById("myChart");
-    if (!canvas) return;
+
+    if (!canvas) {
+        console.error("Canvas not found");
+        return;
+    }
 
     const ctx = canvas.getContext("2d");
 
@@ -37,15 +44,15 @@ function initChart() {
             labels: [],
             datasets: [
                 {
-                    label: "Temperature (°C)",
+                    label: "Temperature",
                     data: [],
-                    borderColor: "#ef4444",
+                    borderColor: "red",
                     tension: 0.3
                 },
                 {
                     label: "Vibration (x1000)",
                     data: [],
-                    borderColor: "#22c55e",
+                    borderColor: "green",
                     tension: 0.3
                 }
             ]
@@ -55,28 +62,14 @@ function initChart() {
             maintainAspectRatio: false
         }
     });
+
+    console.log("CHART READY");
 }
 
-// ================= START =================
-function startMonitoring() {
-
-    if (fetchInterval) clearInterval(fetchInterval);
-
-    isMonitoring = true;
-
-    toggleButtons(true);
-
-    logEvent("MONITORING STARTED");
-
-    fetchData(); // immediate first fetch
-
-    fetchInterval = setInterval(fetchData, FETCH_INTERVAL_MS);
-}
-
-// ================= FETCH DATA =================
+// ================= FETCH LOOP =================
 async function fetchData() {
 
-    if (!isMonitoring || isFetching) return;
+    if (isFetching) return;
     isFetching = true;
 
     try {
@@ -84,112 +77,52 @@ async function fetchData() {
         const res = await fetch(url + "?t=" + Date.now());
         const text = await res.text();
 
-        console.log("RAW RESPONSE:", text);
+        console.log("RESPONSE:", text);
 
-        const syncStatus = document.getElementById("sync-status");
+        // We DON'T rely on response for data (Apps Script = OK only)
 
-        // ❌ ERROR HANDLING
-        if (text.includes("ERROR") || text.includes("MISSING") || text.includes("NO_")) {
-            if (syncStatus) syncStatus.innerText = "Server Error";
-            logEvent("SERVER ERROR: " + text, "error");
-            return;
-        }
+        const temp = parseFloat(document.getElementById("temp-val")?.innerText || 0);
+        const vib = parseFloat(document.getElementById("vib-val")?.innerText || 0);
 
-        // ✔ OK RESPONSE (your Apps Script returns OK only)
-        if (text.trim() === "OK") {
+        updateChart(temp, vib);
 
-            if (syncStatus) syncStatus.innerText = "Live";
-
-            logEvent("SYNC OK");
-
-            // IMPORTANT:
-            // We assume ESP already updates values on UI or last known cache
-            // So we read from UI elements OR fallback values
-
-            const temp = parseFloat(document.getElementById("temp-val")?.innerText || 0);
-            const vib = parseFloat(document.getElementById("vib-val")?.innerText || 0);
-
-            updateDashboard(temp, vib, "LIVE");
-
-        } else {
-            logEvent("UNKNOWN RESPONSE: " + text);
-        }
+        document.getElementById("sync-status").innerText = "Live";
 
     } catch (err) {
 
         console.error(err);
 
-        const syncStatus = document.getElementById("sync-status");
-        if (syncStatus) syncStatus.innerText = "Offline";
-
-        logEvent("NETWORK ERROR", "error");
+        document.getElementById("sync-status").innerText = "Offline";
 
     } finally {
         isFetching = false;
     }
 }
 
-// ================= DASHBOARD UPDATE =================
-function updateDashboard(temp, vib, status) {
+// ================= UPDATE CHART =================
+function updateChart(temp, vib) {
 
-    const t = parseFloat(temp) || 0;
-    const v = parseFloat(vib) || 0;
+    if (!myChart) return;
 
-    // DISPLAY (fixed decimals)
-    document.getElementById("temp-val").innerText = t.toFixed(2);
-    document.getElementById("vib-val").innerText = v.toFixed(4);
-
-    // SCALE vibration for visibility (IMPORTANT FIX)
-    const vibScaled = v * 1000;
-
+    const vibScaled = vib * 1000;
     const time = new Date().toLocaleTimeString();
 
     myChart.data.labels.push(time);
-    myChart.data.datasets[0].data.push(t);
+    myChart.data.datasets[0].data.push(temp);
     myChart.data.datasets[1].data.push(vibScaled);
 
-    // keep last 20 points
     if (myChart.data.labels.length > 20) {
         myChart.data.labels.shift();
         myChart.data.datasets.forEach(d => d.data.shift());
     }
 
     myChart.update("none");
-
-    document.getElementById("status-label").innerText = status;
 }
 
-// ================= STOP =================
+// ================= OPTIONAL STOP =================
 function stopMonitoring() {
 
-    isMonitoring = false;
+    clearInterval(fetchInterval);
 
-    if (fetchInterval) clearInterval(fetchInterval);
-
-    toggleButtons(false);
-
-    document.getElementById("status-label").innerText = "STOPPED";
-
-    logEvent("MONITORING STOPPED");
-}
-
-// ================= UI TOGGLE =================
-function toggleButtons(running) {
-
-    const connect = document.getElementById("connect-btn");
-    const disconnect = document.getElementById("disconnect-btn");
-
-    if (connect) connect.style.display = running ? "none" : "inline-block";
-    if (disconnect) disconnect.style.display = running ? "inline-block" : "none";
-}
-
-// ================= LOGGING =================
-function logEvent(msg, type = "") {
-    console.log(`[${type || "INFO"}] ${msg}`);
-}
-
-// ================= STORAGE =================
-function loadLogsFromStorage() {
-    const logs = JSON.parse(localStorage.getItem("motor_logs")) || [];
-    logs.forEach(l => logEvent(l.message, l.type));
+    console.log("MONITORING STOPPED");
 }
