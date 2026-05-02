@@ -49,14 +49,8 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
-                    position: 'left',
-                    min: 0
-                },
-                y1: {
-                    position: 'right',
-                    min: 0
-                }
+                y: { position: 'left', min: 0 },
+                y1: { position: 'right', min: 0 }
             }
         }
     });
@@ -91,39 +85,35 @@ function loadLogsFromStorage() {
     logs.forEach(l => logEvent(l.message, l.type));
 }
 
-// ================= START MONITORING =================
+// ================= START =================
 function startMonitoring() {
     if (fetchInterval) clearInterval(fetchInterval);
 
     isMonitoring = true;
-
     toggleButtons(true);
+
     logEvent("MONITORING STARTED");
 
     fetchDataFromSheets();
-
     fetchInterval = setInterval(fetchDataFromSheets, FETCH_INTERVAL_MS);
 }
 
-// ================= FETCH DATA (STABLE FIX) =================
+// ================= FETCH (FULLY STABLE) =================
 async function fetchDataFromSheets() {
 
     if (!isMonitoring || isFetching) return;
     isFetching = true;
 
     try {
-
         const response = await fetch(`${url}?t=${Date.now()}`);
         const text = await response.text();
 
-        console.log("RAW RESPONSE:", text);
-
         const syncLabel = document.getElementById('sync-status');
 
-        // ================= SAFE ERROR DETECTION =================
-        if (text.includes("ERROR") ||
-            text.includes("MISSING") ||
-            text.includes("NO_") ) {
+        console.log("RAW:", text);
+
+        // ❌ HARD FAIL CASES
+        if (!text || text.includes("ERROR") || text.includes("NO_")) {
 
             if (syncLabel) {
                 syncLabel.innerText = "Server Error";
@@ -134,24 +124,38 @@ async function fetchDataFromSheets() {
             return;
         }
 
-        // ================= SUCCESS CASE =================
-        if (text.trim() === "OK") {
+        // ❌ NOT JSON (safe fallback)
+        let data = null;
 
-            if (syncLabel) {
-                syncLabel.innerText = "Live";
-                syncLabel.style.color = "#22c55e";
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            // if not JSON, treat as OK text response
+            if (text.trim() === "OK") {
+
+                if (syncLabel) {
+                    syncLabel.innerText = "Live";
+                    syncLabel.style.color = "#22c55e";
+                }
+
+                logEvent("SYNC OK");
+                return;
             }
 
-            logEvent("SYNC OK");
+            throw new Error("Invalid response: " + text);
+        }
 
-        } else {
+        // ================= VALID JSON DATA =================
+        updateDashboard(
+            data.temp || 0,
+            data.vibration || 0,
+            "LIVE",
+            (data.tempStatus || "") + "|" + (data.vibStatus || "")
+        );
 
-            if (syncLabel) {
-                syncLabel.innerText = "Warning";
-                syncLabel.style.color = "#fbbf24";
-            }
-
-            logEvent("SYNC RESPONSE: " + text);
+        if (syncLabel) {
+            syncLabel.innerText = "Live";
+            syncLabel.style.color = "#22c55e";
         }
 
     } catch (e) {
@@ -171,17 +175,14 @@ async function fetchDataFromSheets() {
     }
 }
 
-// ================= DASHBOARD UPDATE =================
+// ================= DASHBOARD =================
 function updateDashboard(temp, vib, status, action) {
 
     const t = parseFloat(temp) || 0;
     const v = parseFloat(vib) || 0;
 
-    const tempEl = document.getElementById("temp-val");
-    const vibEl = document.getElementById("vib-val");
-
-    if (tempEl) tempEl.innerText = t.toFixed(1);
-    if (vibEl) vibEl.innerText = v.toFixed(3);
+    document.getElementById("temp-val").innerText = t.toFixed(1);
+    document.getElementById("vib-val").innerText = v.toFixed(3);
 
     if (isMonitoring && status !== "OFFLINE") {
 
@@ -203,24 +204,19 @@ function updateDashboard(temp, vib, status, action) {
         myChart.update('none');
     }
 
-    const statusLabel = document.getElementById("status-label");
-    const aiAction = document.getElementById("ai-action-step");
-
-    if (statusLabel) statusLabel.innerText = action;
-    if (aiAction) aiAction.innerText = action;
+    document.getElementById("status-label").innerText = action;
+    document.getElementById("ai-action-step").innerText = action;
 }
 
-// ================= UI HELPERS =================
+// ================= UI =================
 function toggleButtons(state) {
-    const conn = document.getElementById("connect-btn");
-    const disc = document.getElementById("disconnect-btn");
-
-    if (conn) conn.style.display = state ? "none" : "inline-block";
-    if (disc) disc.style.display = state ? "inline-block" : "none";
+    document.getElementById("connect-btn").style.display = state ? "none" : "inline-block";
+    document.getElementById("disconnect-btn").style.display = state ? "inline-block" : "none";
 }
 
 // ================= STOP =================
 function stopMonitoring() {
+
     isMonitoring = false;
 
     if (fetchInterval) clearInterval(fetchInterval);
