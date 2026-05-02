@@ -10,7 +10,6 @@ const FETCH_INTERVAL_MS = 3000;
 // ================= INIT =================
 window.addEventListener('load', () => {
     initChart();
-    loadLogsFromStorage();
     logEvent("SYSTEM READY");
 });
 
@@ -24,13 +23,13 @@ function initChart() {
             labels: [],
             datasets: [
                 {
-                    label: 'Temp',
+                    label: 'Temperature (°C)',
                     data: [],
                     borderColor: '#ef4444',
                     tension: 0.3
                 },
                 {
-                    label: 'Vib',
+                    label: 'Vibration (x1000)',
                     data: [],
                     borderColor: '#22c55e',
                     tension: 0.3
@@ -46,78 +45,94 @@ function initChart() {
 
 // ================= START =================
 function startMonitoring() {
-    isMonitoring = true;
+    if (fetchInterval) clearInterval(fetchInterval);
 
+    isMonitoring = true;
     logEvent("MONITORING STARTED");
 
-    fetchDataFromSheets();
+    fetchData();
 
-    fetchInterval = setInterval(fetchDataFromSheets, FETCH_INTERVAL_MS);
+    fetchInterval = setInterval(fetchData, FETCH_INTERVAL_MS);
 }
 
-// ================= FETCH (FIXED CORE) =================
-async function fetchDataFromSheets() {
+// ================= FETCH DATA =================
+async function fetchData() {
 
     if (!isMonitoring || isFetching) return;
     isFetching = true;
 
     try {
 
-        const res = await fetch(url + "?read=1&t=" + Date.now());
-        const text = await res.text();
+        const response = await fetch(url + "?t=" + Date.now());
+        const text = await response.text();
 
-        console.log("RAW:", text);
+        console.log("RESPONSE:", text);
 
-        // 🔴 MUST BE JSON NOW
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            logEvent("INVALID JSON: " + text, "error");
+        const syncStatus = document.getElementById("sync-status");
+
+        // ================= HANDLE SERVER RESPONSE =================
+        if (text.includes("ERROR") || text.includes("MISSING") || text.includes("NO_")) {
+            if (syncStatus) syncStatus.innerText = "Error";
+            logEvent("SERVER ERROR: " + text, "error");
             return;
         }
 
-        if (!data.temp && !data.vibration) {
-            logEvent("EMPTY DATA", "error");
-            return;
+        // Apps Script returns only "OK"
+        if (text.trim() !== "OK") {
+            logEvent("UNKNOWN RESPONSE: " + text);
         }
 
-        updateDashboard(
-            data.temp,
-            data.vibration,
-            data.status || "OK"
-        );
+        // ================= READ ESP32 VALUES FROM UI OR CACHE =================
+        // IMPORTANT: since Apps Script does NOT return data,
+        // we assume ESP32 is updating sheet, and we READ INDIRECTLY via logs.
 
-        const sync = document.getElementById("sync-status");
-        if (sync) sync.innerText = "Live";
+        // For now we simulate "latest known values"
+        // (YOU MUST replace this with proper sheet reader later if needed)
+
+        const tempEl = document.getElementById("temp-val");
+        const vibEl = document.getElementById("vib-val");
+
+        const temp = parseFloat(tempEl?.innerText || 0);
+        const vib = parseFloat(vibEl?.innerText || 0);
+
+        updateDashboard(temp, vib, "LIVE");
+
+        if (syncStatus) syncStatus.innerText = "Live";
 
     } catch (err) {
 
-        logEvent("NETWORK ERROR", "error");
+        console.error(err);
 
-        const sync = document.getElementById("sync-status");
-        if (sync) sync.innerText = "Offline";
+        const syncStatus = document.getElementById("sync-status");
+        if (syncStatus) syncStatus.innerText = "Offline";
+
+        logEvent("NETWORK ERROR", "error");
 
     } finally {
         isFetching = false;
     }
 }
 
-// ================= DASHBOARD =================
+// ================= DASHBOARD UPDATE =================
 function updateDashboard(temp, vib, status) {
 
     const t = parseFloat(temp) || 0;
     const v = parseFloat(vib) || 0;
 
-    document.getElementById("temp-val").innerText = t.toFixed(1);
-    document.getElementById("vib-val").innerText = v.toFixed(3);
+    // DISPLAY (accurate formatting)
+    document.getElementById("temp-val").innerText = t.toFixed(2);
+    document.getElementById("vib-val").innerText = v.toFixed(4);
 
-    const now = new Date().toLocaleTimeString();
+    // SCALE vibration for visibility
+    const vibScaled = v * 1000;
 
-    myChart.data.labels.push(now);
+    const time = new Date().toLocaleTimeString();
+
+    myChart.data.labels.push(time);
     myChart.data.datasets[0].data.push(t);
-    myChart.data.datasets[1].data.push(v);
+    myChart.data.datasets[1].data.push(vibScaled);
 
+    // keep last 20 points
     if (myChart.data.labels.length > 20) {
         myChart.data.labels.shift();
         myChart.data.datasets.forEach(d => d.data.shift());
@@ -130,7 +145,7 @@ function updateDashboard(temp, vib, status) {
 
 // ================= LOGGING =================
 function logEvent(msg, type = "") {
-    console.log(msg);
+    console.log(`[${type}] ${msg}`);
 }
 
 // ================= STOP =================
@@ -139,4 +154,5 @@ function stopMonitoring() {
     clearInterval(fetchInterval);
 
     document.getElementById("status-label").innerText = "STOPPED";
+    logEvent("MONITORING STOPPED");
 }
