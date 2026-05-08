@@ -18,9 +18,12 @@ function initChart() {
     const ctx = document.getElementById("myChart").getContext("2d");
 
     myChart = new Chart(ctx, {
+
         type: "line",
+
         data: {
             labels: [],
+
             datasets: [
                 {
                     label: "Temperature (°C)",
@@ -29,6 +32,7 @@ function initChart() {
                     borderWidth: 2,
                     tension: 0.3
                 },
+
                 {
                     label: "Vibration (G)",
                     data: [],
@@ -40,6 +44,7 @@ function initChart() {
         },
 
         options: {
+
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
@@ -48,6 +53,7 @@ function initChart() {
                 y: {
                     beginAtZero: true
                 },
+
                 x: {
                     display: true
                 }
@@ -64,7 +70,8 @@ function startAutoFetch() {
 
     fetchLatestData();
 
-    fetchInterval = setInterval(fetchLatestData, FETCH_INTERVAL_MS);
+    fetchInterval =
+        setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
 // ================= FETCH DATA =================
@@ -84,11 +91,14 @@ async function fetchLatestData() {
         console.log("RAW:", text);
 
         // ================= INVALID RESPONSE =================
-        if (!text ||
+        if (
+            !text ||
             text.includes("ERROR") ||
-            text.includes("MISSING")) {
+            text.includes("MISSING")
+        ) {
 
             updateStatus("ERROR", "#ef4444");
+
             isFetching = false;
             return;
         }
@@ -97,22 +107,31 @@ async function fetchLatestData() {
         let data;
 
         try {
+
             data = JSON.parse(text);
-        }
-        catch {
+
+        } catch {
+
             console.warn("Invalid JSON");
+
             isFetching = false;
             return;
         }
 
         if (!data) {
+
             isFetching = false;
             return;
         }
 
+        console.log("PARSED:", data);
+
         // ================= VALUES =================
-        const temp = parseFloat(data.temp) || 0;
-        const vib  = parseFloat(data.vibration) || 0;
+        const temp =
+            parseFloat(data.temp) || 0;
+
+        const vib =
+            parseFloat(data.vibration) || 0;
 
         document.getElementById("temp-display").innerText =
             temp.toFixed(1);
@@ -123,7 +142,8 @@ async function fetchLatestData() {
         updateStatus("LIVE", "#22c55e");
 
         // ================= UPDATE CHART =================
-        const time = new Date().toLocaleTimeString();
+        const time =
+            new Date().toLocaleTimeString();
 
         myChart.data.labels.push(time);
 
@@ -140,35 +160,31 @@ async function fetchLatestData() {
         myChart.update();
 
         // ================= FPGA STATUS =================
-        const status =
-            (data.status || "").toLowerCase();
+        const tempStatus =
+            (data.tempStatus || "")
+            .toString()
+            .trim()
+            .toLowerCase();
 
-        let systemStatus = "NORMAL OPERATION";
+        const vibStatus =
+            (data.vibStatus || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        console.log("TEMP STATUS:", tempStatus);
+        console.log("VIB STATUS:", vibStatus);
+
+        let systemStatus =
+            "NORMAL OPERATION";
+
         let maintenanceAction =
             "System running with real-time sensor feed.";
 
-        // ================= OVERHEATING =================
-        if (status.includes("temp_overheating")) {
-
-            systemStatus = "OVERHEATING DETECTED";
-
-            maintenanceAction =
-                "Recommended Maintenance: Inspect motor cooling, check airflow obstruction, inspect capacitor condition, and reduce prolonged overload operation.";
-        }
-
-        // ================= BLOCKED BEARING =================
-        else if (status.includes("vib_blocked_bearing")) {
-
-            systemStatus = "BLOCKED BEARING DETECTED";
-
-            maintenanceAction =
-                "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary.";
-        }
-
         // ================= BOTH FAULTS =================
         if (
-            status.includes("temp_overheating") &&
-            status.includes("vib_blocked_bearing")
+            tempStatus.includes("temp_overheating") &&
+            vibStatus.includes("vib_blocked_bearing")
         ) {
 
             systemStatus =
@@ -178,14 +194,38 @@ async function fetchLatestData() {
                 "Recommended Maintenance: Immediately inspect motor bearings, lubrication, cooling system, airflow path, and overall motor load condition.";
         }
 
+        // ================= BLOCKED BEARING =================
+        else if (
+            vibStatus.includes("vib_blocked_bearing")
+        ) {
+
+            systemStatus =
+                "BLOCKED BEARING DETECTED";
+
+            maintenanceAction =
+                "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary.";
+        }
+
+        // ================= OVERHEATING =================
+        else if (
+            tempStatus.includes("temp_overheating")
+        ) {
+
+            systemStatus =
+                "OVERHEATING DETECTED";
+
+            maintenanceAction =
+                "Recommended Maintenance: Inspect motor cooling, check airflow obstruction, inspect capacitor condition, and reduce prolonged overload operation.";
+        }
+
         // ================= DISPLAY =================
         document.getElementById("status-label").innerText =
             systemStatus;
 
         document.getElementById("ai-action-step").innerText =
             maintenanceAction;
-
     }
+
     catch (err) {
 
         console.error(err);
@@ -199,7 +239,8 @@ async function fetchLatestData() {
 // ================= STATUS UI =================
 function updateStatus(text, color) {
 
-    const el = document.getElementById("sync-status");
+    const el =
+        document.getElementById("sync-status");
 
     if (!el) return;
 
