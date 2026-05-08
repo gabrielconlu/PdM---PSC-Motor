@@ -7,7 +7,7 @@ let isFetching = false;
 
 const FETCH_INTERVAL_MS = 3000;
 
-// ================= AUTO START =================
+// ================= INIT =================
 window.addEventListener("load", () => {
     initChart();
     startAutoFetch();
@@ -22,7 +22,6 @@ function initChart() {
     myChart = new Chart(ctx, {
 
         type: "line",
-
         data: {
             labels: [],
             datasets: [
@@ -55,7 +54,7 @@ function initChart() {
     });
 }
 
-// ================= START =================
+// ================= START FETCH =================
 function startAutoFetch() {
 
     if (fetchInterval)
@@ -67,54 +66,51 @@ function startAutoFetch() {
         setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
-// ================= SIMPLE CONDITION DISPLAY =================
+// ================= NORMALIZE =================
+function normalize(str) {
+
+    return (str || "")
+        .toString()
+        .toUpperCase()
+        .replace(/\s+/g, "_")
+        .replace(/-+/g, "_")
+        .trim();
+}
+
+// ================= CONDITION ENGINE =================
 function getMaintenanceOutput(tempStatus, vibStatus) {
 
-    const t =
-        (tempStatus || "").toUpperCase().trim();
+    const t = normalize(tempStatus);
+    const v = normalize(vibStatus);
 
-    const v =
-        (vibStatus || "").toUpperCase().trim();
-
-    // ================= BOTH FAULTS =================
     if (t === "OVERHEATING" && v === "BLOCKED_BEARING") {
-
         return {
-            status: "OVERHEATING + BLOCKED BEARING",
-            action:
-                "Critical: Check cooling system, lubrication, bearing damage, and motor load immediately."
+            status: "CRITICAL FAULT",
+            action: "Check cooling system, bearing damage, lubrication, and motor load immediately."
         };
     }
 
-    // ================= BLOCKED BEARING ONLY =================
     if (v === "BLOCKED_BEARING") {
-
         return {
             status: "BLOCKED BEARING DETECTED",
-            action:
-                "Inspect bearing wear, lubrication failure, shaft obstruction, and replace bearing if needed."
+            action: "Inspect bearing, lubrication failure, and shaft obstruction."
         };
     }
 
-    // ================= OVERHEATING ONLY =================
     if (t === "OVERHEATING") {
-
         return {
             status: "OVERHEATING DETECTED",
-            action:
-                "Check cooling fan, airflow blockage, and motor overload condition."
+            action: "Check cooling fan, airflow, and motor overload."
         };
     }
 
-    // ================= NORMAL =================
     return {
         status: "NORMAL",
-        action:
-            "System operating normally."
+        action: "System operating within safe range."
     };
 }
 
-// ================= FETCH DATA =================
+// ================= FETCH =================
 async function fetchLatestData() {
 
     if (isFetching) return;
@@ -127,6 +123,8 @@ async function fetchLatestData() {
 
         const data =
             await response.json();
+
+        console.log("DATA:", data);
 
         const temp =
             parseFloat(data.temp) || 0;
@@ -153,7 +151,7 @@ async function fetchLatestData() {
 
         myChart.update();
 
-        // ================= FPGA OUTPUT ONLY =================
+        // ================= STATUS =================
         const result =
             getMaintenanceOutput(
                 data.tempStatus,
