@@ -77,7 +77,7 @@ async function fetchLatestData() {
             themeColor = "#fbbf24"; // Yellow
         } else if (vStatus === "BLOCKED_BEARING") {
             mainStatusText = "WARNING: BLOCKED BEARING";
-            adviceText = "Lubricate motor shaft or check for mechanical blockages.";
+            adviceText = "Lubricate motor shaft, check for mechanical blockages.";
             themeColor = "#fbbf24"; // Yellow
         }
 
