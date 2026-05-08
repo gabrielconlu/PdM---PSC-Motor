@@ -24,8 +24,11 @@ function initChart() {
         type: "line",
 
         data: {
+
             labels: [],
+
             datasets: [
+
                 {
                     label: "Temperature (°C)",
                     data: [],
@@ -33,6 +36,7 @@ function initChart() {
                     borderWidth: 2,
                     tension: 0.3
                 },
+
                 {
                     label: "Vibration (G)",
                     data: [],
@@ -44,12 +48,18 @@ function initChart() {
         },
 
         options: {
+
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
+
             scales: {
-                y: { beginAtZero: true },
-                x: { display: true }
+                y: {
+                    beginAtZero: true
+                },
+                x: {
+                    display: true
+                }
             }
         }
     });
@@ -67,65 +77,50 @@ function startAutoFetch() {
         setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
-// ================= FPGA-BASED RULE ENGINE =================
-function interpretFPGAStatus(statusText) {
+// ================= CONDITION INTERPRETER (FPGA-BASED) =================
+function interpretFPGAStatus(tempStatus, vibStatus) {
 
-    const faults =
-        (statusText || "")
-            .toLowerCase()
-            .split("|")
-            .map(s => s.trim());
+    const t =
+        (tempStatus || "").toUpperCase().trim();
 
-    const hasOverheat =
-        faults.includes("overheating");
-
-    const hasBearing =
-        faults.includes("blocked_bearing");
-
-    // ================= NORMAL =================
-    if (!hasOverheat && !hasBearing) {
-
-        return {
-            status: "NORMAL OPERATION",
-            action:
-                "System operating within safe FPGA-predicted limits."
-        };
-    }
+    const v =
+        (vibStatus || "").toUpperCase().trim();
 
     // ================= CRITICAL COMBINATION =================
-    if (hasOverheat && hasBearing) {
+    if (t === "OVERHEATING" && v === "BLOCKED_BEARING") {
 
         return {
-            status: "CRITICAL SYSTEM DEGRADATION (FPGA CONFIRMED)",
+            status: "CRITICAL FAULT: OVERHEATING + BLOCKED BEARING",
             action:
-                "Immediate shutdown recommended. FPGA detected simultaneous overheating and bearing blockage indicating possible mechanical seizure."
+                "Immediate shutdown recommended. FPGA detected thermal runaway combined with mechanical blockage. Inspect bearings, lubrication system, cooling fan, and motor load condition."
         };
     }
 
     // ================= BLOCKED BEARING ONLY =================
-    if (hasBearing) {
+    if (v === "BLOCKED_BEARING") {
 
         return {
             status: "BLOCKED BEARING DETECTED (FPGA)",
             action:
-                "FPGA indicates mechanical resistance in rotor. Inspect bearings, lubrication, and shaft alignment. Replace bearing if abnormal torque persists."
+                "Mechanical obstruction detected. Inspect bearing wear, lubrication failure, shaft misalignment, and replace bearing if abnormal resistance persists."
         };
     }
 
     // ================= OVERHEATING ONLY =================
-    if (hasOverheat) {
+    if (t === "OVERHEATING") {
 
         return {
             status: "OVERHEATING DETECTED (FPGA)",
             action:
-                "FPGA detected thermal anomaly. Check cooling system, airflow restriction, and motor load. Prevent sustained operation."
+                "Thermal anomaly detected. Check cooling system, airflow blockage, capacitor health, and motor overload conditions."
         };
     }
 
-    // ================= FALLBACK =================
+    // ================= NORMAL =================
     return {
-        status: "UNKNOWN FPGA STATE",
-        action: "Verify FPGA communication and sensor integrity."
+        status: "NORMAL OPERATION",
+        action:
+            "System operating within FPGA-defined safe thresholds. No maintenance required."
     };
 }
 
@@ -149,8 +144,10 @@ async function fetchLatestData() {
             return;
         }
 
-        const data = JSON.parse(text);
+        const data =
+            JSON.parse(text);
 
+        // ================= SENSOR VALUES =================
         const temp =
             parseFloat(data.temp) || 0;
 
@@ -165,11 +162,12 @@ async function fetchLatestData() {
 
         updateStatus("LIVE", "#22c55e");
 
-        // ================= CHART =================
+        // ================= CHART UPDATE =================
         const time =
             new Date().toLocaleTimeString();
 
         myChart.data.labels.push(time);
+
         myChart.data.datasets[0].data.push(temp);
         myChart.data.datasets[1].data.push(vib);
 
@@ -184,9 +182,19 @@ async function fetchLatestData() {
 
         myChart.update();
 
-        // ================= FPGA STATUS =================
+        // ================= FPGA STATUS FROM SHEETS =================
+        const tempStatus =
+            data.tempStatus;
+
+        const vibStatus =
+            data.vibStatus;
+
+        console.log("FPGA TEMP STATUS:", tempStatus);
+        console.log("FPGA VIB STATUS:", vibStatus);
+
+        // ================= CONDITION ASSESSMENT =================
         const result =
-            interpretFPGAStatus(data.status);
+            interpretFPGAStatus(tempStatus, vibStatus);
 
         document.getElementById("status-label").innerText =
             result.status;
