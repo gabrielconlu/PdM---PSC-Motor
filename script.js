@@ -14,6 +14,7 @@ window.addEventListener("load", () => {
 
 // ================= CHART =================
 function initChart() {
+
     const ctx = document.getElementById("myChart").getContext("2d");
 
     myChart = new Chart(ctx, {
@@ -37,13 +38,19 @@ function initChart() {
                 }
             ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
+
             scales: {
-                y: { beginAtZero: true },
-                x: { display: true }
+                y: {
+                    beginAtZero: true
+                },
+                x: {
+                    display: true
+                }
             }
         }
     });
@@ -52,9 +59,10 @@ function initChart() {
 // ================= AUTO FETCH =================
 function startAutoFetch() {
 
-    if (fetchInterval) clearInterval(fetchInterval);
+    if (fetchInterval)
+        clearInterval(fetchInterval);
 
-    fetchLatestData(); // immediate first fetch
+    fetchLatestData();
 
     fetchInterval = setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
@@ -63,40 +71,54 @@ function startAutoFetch() {
 async function fetchLatestData() {
 
     if (isFetching) return;
+
     isFetching = true;
 
     try {
-        const response = await fetch(url + "?read=true&t=" + Date.now());
+
+        const response =
+            await fetch(url + "?read=true&t=" + Date.now());
+
         const text = await response.text();
 
         console.log("RAW:", text);
 
-        // ❌ ignore non-data responses
-        if (!text || text.includes("ERROR") || text.includes("MISSING")) {
+        // ================= INVALID RESPONSE =================
+        if (!text ||
+            text.includes("ERROR") ||
+            text.includes("MISSING")) {
+
             updateStatus("ERROR", "#ef4444");
+            isFetching = false;
             return;
         }
 
-        // ================= TRY PARSE JSON =================
+        // ================= PARSE JSON =================
         let data;
 
         try {
             data = JSON.parse(text);
-        } catch {
-            // fallback if Apps Script returns row text
-            console.warn("Not JSON, skipping parse");
+        }
+        catch {
+            console.warn("Invalid JSON");
+            isFetching = false;
             return;
         }
 
-        if (!data) return;
+        if (!data) {
+            isFetching = false;
+            return;
+        }
 
-        // ================= PARSE VALUES =================
+        // ================= VALUES =================
         const temp = parseFloat(data.temp) || 0;
-        const vib = parseFloat(data.vibration) || 0;
+        const vib  = parseFloat(data.vibration) || 0;
 
-        // ================= FIX FLOAT DISPLAY =================
-        document.getElementById("temp-display").innerText = temp.toFixed(1);
-        document.getElementById("vib-display").innerText = vib.toFixed(3);
+        document.getElementById("temp-display").innerText =
+            temp.toFixed(1);
+
+        document.getElementById("vib-display").innerText =
+            vib.toFixed(3);
 
         updateStatus("LIVE", "#22c55e");
 
@@ -104,25 +126,70 @@ async function fetchLatestData() {
         const time = new Date().toLocaleTimeString();
 
         myChart.data.labels.push(time);
+
         myChart.data.datasets[0].data.push(temp);
         myChart.data.datasets[1].data.push(vib);
 
         if (myChart.data.labels.length > 20) {
+
             myChart.data.labels.shift();
+
             myChart.data.datasets.forEach(d => d.data.shift());
         }
 
         myChart.update();
 
-        // ================= STATUS =================
-        document.getElementById("status-label").innerText =
-            data.fpga_action || "NORMAL OPERATION";
+        // ================= FPGA STATUS =================
+        const status =
+            (data.status || "").toLowerCase();
 
-        document.getElementById("ai-action-step").innerText =
+        let systemStatus = "NORMAL OPERATION";
+        let maintenanceAction =
             "System running with real-time sensor feed.";
 
-    } catch (err) {
+        // ================= OVERHEATING =================
+        if (status.includes("temp_overheating")) {
+
+            systemStatus = "OVERHEATING DETECTED";
+
+            maintenanceAction =
+                "Recommended Maintenance: Inspect motor cooling, check airflow obstruction, inspect capacitor condition, and reduce prolonged overload operation.";
+        }
+
+        // ================= BLOCKED BEARING =================
+        else if (status.includes("vib_blocked_bearing")) {
+
+            systemStatus = "BLOCKED BEARING DETECTED";
+
+            maintenanceAction =
+                "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary.";
+        }
+
+        // ================= BOTH FAULTS =================
+        if (
+            status.includes("temp_overheating") &&
+            status.includes("vib_blocked_bearing")
+        ) {
+
+            systemStatus =
+                "MULTIPLE FAULT CONDITIONS DETECTED";
+
+            maintenanceAction =
+                "Recommended Maintenance: Immediately inspect motor bearings, lubrication, cooling system, airflow path, and overall motor load condition.";
+        }
+
+        // ================= DISPLAY =================
+        document.getElementById("status-label").innerText =
+            systemStatus;
+
+        document.getElementById("ai-action-step").innerText =
+            maintenanceAction;
+
+    }
+    catch (err) {
+
         console.error(err);
+
         updateStatus("OFFLINE", "#ef4444");
     }
 
@@ -131,7 +198,9 @@ async function fetchLatestData() {
 
 // ================= STATUS UI =================
 function updateStatus(text, color) {
+
     const el = document.getElementById("sync-status");
+
     if (!el) return;
 
     el.innerText = text;
