@@ -24,11 +24,8 @@ function initChart() {
         type: "line",
 
         data: {
-
             labels: [],
-
             datasets: [
-
                 {
                     label: "Temperature (°C)",
                     data: [],
@@ -36,7 +33,6 @@ function initChart() {
                     borderWidth: 2,
                     tension: 0.3
                 },
-
                 {
                     label: "Vibration (G)",
                     data: [],
@@ -48,19 +44,12 @@ function initChart() {
         },
 
         options: {
-
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-
             scales: {
-                y: {
-                    beginAtZero: true
-                },
-
-                x: {
-                    display: true
-                }
+                y: { beginAtZero: true },
+                x: { display: true }
             }
         }
     });
@@ -78,46 +67,72 @@ function startAutoFetch() {
         setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
-// ================= CONDITION ENGINE =================
-const conditionRules = [
+// ================= FPGA-BASED RULE ENGINE =================
+function interpretFPGAStatus(statusText) {
 
-    {
-        condition: (t, v) =>
-            t.includes("temp_overheating") &&
-            v.includes("vib_blocked_bearing"),
+    const faults =
+        (statusText || "")
+            .toLowerCase()
+            .split("|")
+            .map(s => s.trim());
 
-        status: "MULTIPLE FAULT CONDITIONS DETECTED",
+    const hasOverheat =
+        faults.includes("overheating");
 
-        action:
-            "Recommended Maintenance: Immediately inspect motor bearings, lubrication system, cooling system, airflow path, and overall motor load condition."
-    },
+    const hasBearing =
+        faults.includes("blocked_bearing");
 
-    {
-        condition: (t, v) =>
-            v.includes("vib_blocked_bearing"),
+    // ================= NORMAL =================
+    if (!hasOverheat && !hasBearing) {
 
-        status: "BLOCKED BEARING DETECTED",
-
-        action:
-            "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary."
-    },
-
-    {
-        condition: (t, v) =>
-            t.includes("temp_overheating"),
-
-        status: "OVERHEATING DETECTED",
-
-        action:
-            "Recommended Maintenance: Inspect motor cooling system, check airflow obstruction, verify capacitor health, and reduce overload operation."
+        return {
+            status: "NORMAL OPERATION",
+            action:
+                "System operating within safe FPGA-predicted limits."
+        };
     }
-];
+
+    // ================= CRITICAL COMBINATION =================
+    if (hasOverheat && hasBearing) {
+
+        return {
+            status: "CRITICAL SYSTEM DEGRADATION (FPGA CONFIRMED)",
+            action:
+                "Immediate shutdown recommended. FPGA detected simultaneous overheating and bearing blockage indicating possible mechanical seizure."
+        };
+    }
+
+    // ================= BLOCKED BEARING ONLY =================
+    if (hasBearing) {
+
+        return {
+            status: "BLOCKED BEARING DETECTED (FPGA)",
+            action:
+                "FPGA indicates mechanical resistance in rotor. Inspect bearings, lubrication, and shaft alignment. Replace bearing if abnormal torque persists."
+        };
+    }
+
+    // ================= OVERHEATING ONLY =================
+    if (hasOverheat) {
+
+        return {
+            status: "OVERHEATING DETECTED (FPGA)",
+            action:
+                "FPGA detected thermal anomaly. Check cooling system, airflow restriction, and motor load. Prevent sustained operation."
+        };
+    }
+
+    // ================= FALLBACK =================
+    return {
+        status: "UNKNOWN FPGA STATE",
+        action: "Verify FPGA communication and sensor integrity."
+    };
+}
 
 // ================= FETCH DATA =================
 async function fetchLatestData() {
 
     if (isFetching) return;
-
     isFetching = true;
 
     try {
@@ -127,39 +142,15 @@ async function fetchLatestData() {
 
         const text = await response.text();
 
-        console.log("RAW:", text);
-
-        // ================= INVALID RESPONSE =================
-        if (
-            !text ||
-            text.includes("ERROR") ||
-            text.includes("MISSING")
-        ) {
+        if (!text || text.includes("ERROR")) {
 
             updateStatus("ERROR", "#ef4444");
             isFetching = false;
             return;
         }
 
-        // ================= PARSE JSON =================
-        let data;
+        const data = JSON.parse(text);
 
-        try {
-            data = JSON.parse(text);
-        } catch {
-            console.warn("Invalid JSON");
-            isFetching = false;
-            return;
-        }
-
-        if (!data) {
-            isFetching = false;
-            return;
-        }
-
-        console.log("PARSED:", data);
-
-        // ================= VALUES =================
         const temp =
             parseFloat(data.temp) || 0;
 
@@ -174,12 +165,11 @@ async function fetchLatestData() {
 
         updateStatus("LIVE", "#22c55e");
 
-        // ================= UPDATE CHART =================
+        // ================= CHART =================
         const time =
             new Date().toLocaleTimeString();
 
         myChart.data.labels.push(time);
-
         myChart.data.datasets[0].data.push(temp);
         myChart.data.datasets[1].data.push(vib);
 
@@ -195,52 +185,18 @@ async function fetchLatestData() {
         myChart.update();
 
         // ================= FPGA STATUS =================
-        const tempStatus =
-            (data.tempStatus || "")
-                .toString()
-                .trim()
-                .toLowerCase();
+        const result =
+            interpretFPGAStatus(data.status);
 
-        const vibStatus =
-            (data.vibStatus || "")
-                .toString()
-                .trim()
-                .toLowerCase();
-
-        console.log("TEMP STATUS:", tempStatus);
-        console.log("VIB STATUS:", vibStatus);
-
-        // ================= DEFAULT STATE =================
-        let systemStatus =
-            "NORMAL OPERATION";
-
-        let maintenanceAction =
-            "System running with real-time sensor feed.";
-
-        // ================= RULE ENGINE EVALUATION =================
-        for (const rule of conditionRules) {
-
-            if (rule.condition(tempStatus, vibStatus)) {
-
-                systemStatus = rule.status;
-                maintenanceAction = rule.action;
-
-                break;
-            }
-        }
-
-        // ================= DISPLAY =================
         document.getElementById("status-label").innerText =
-            systemStatus;
+            result.status;
 
         document.getElementById("ai-action-step").innerText =
-            maintenanceAction;
-    }
+            result.action;
 
-    catch (err) {
+    } catch (err) {
 
         console.error(err);
-
         updateStatus("OFFLINE", "#ef4444");
     }
 
