@@ -1,71 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PSC Motor Health Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Health Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #1e293b;
+            --text-primary: #f8fafc; --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6; --accent-green: #22c55e; --accent-red: #ef4444;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-primary); padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+        
+        .header { text-align: center; margin-bottom: 10px; }
+        #sync-status { font-size: 0.8rem; font-weight: bold; }
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link rel="stylesheet" href="style.css">
+        .ai-box { 
+            background: var(--card-bg); padding: 20px; border-radius: 12px; 
+            border-left: 5px solid var(--accent-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        #status-label { font-size: 1.2rem; font-weight: 800; color: var(--accent-blue); margin-bottom: 5px; }
+        #ai-action-step { color: var(--text-secondary); font-size: 0.9rem; }
+
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: var(--card-bg); padding: 30px 10px; border-radius: 12px; text-align: center; }
+        .label { color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 1px; margin-bottom: 10px; }
+        .value { font-size: 3rem; font-weight: 800; font-family: monospace; }
+        .unit { font-size: 1rem; color: var(--text-secondary); }
+
+        .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; height: 350px; }
+    </style>
 </head>
-
 <body>
 
-<div class="top-controls">
-    <button onclick="startMonitoring()">CONNECT SYSTEM</button>
-    <button onclick="stopMonitoring()">DISCONNECT</button>
-</div>
-
 <div class="container">
-
     <div class="header">
-        <h2>PSC MOTOR MONITORING</h2>
-        <div id="sync-status">OFFLINE</div>
+        <h2>MOTOR MONITORING SYSTEM</h2>
+        <div id="sync-status">CONNECTING...</div>
     </div>
 
-    <!-- ================= DATA CARDS ================= -->
-    <div class="metrics-grid">
-
-        <div class="card">
-            <div class="label">Temperature</div>
-            <div class="value">
-                <span id="temp-display">--</span> °C
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="label">Vibration</div>
-            <div class="value">
-                <span id="vib-display">--</span> G
-            </div>
-        </div>
-
-    </div>
-
-    <!-- ================= CONDITION ================= -->
     <div class="ai-box">
-
-        <div id="status-label">SYSTEM INITIALIZING</div>
-
-        <div id="ai-action-step">
-            Waiting for FPGA + sensor data...
-        </div>
-
-        <div>
-            Condition Assessment:
-            <b id="motor-health-score">WAITING</b>
-        </div>
-
+        <div id="status-label">INITIALIZING</div>
+        <div id="ai-action-step">Waiting for data from ESP32...</div>
     </div>
 
-    <!-- ================= CHART ================= -->
-    <canvas id="myChart"></canvas>
+    <div class="metrics-grid">
+        <div class="card">
+            <div class="label">TEMPERATURE</div>
+            <div class="value" id="temp-value" style="color:var(--accent-red)">0.0</div>
+            <span class="unit">°C</span>
+        </div>
+        <div class="card">
+            <div class="label">VIBRATION</div>
+            <div class="value" id="vib-value" style="color:var(--accent-green)">0.000</div>
+            <span class="unit">G</span>
+        </div>
+    </div>
 
-    <!-- ================= LOG ================= -->
-    <div id="system-logs"></div>
-
+    <div class="chart-box">
+        <canvas id="myChart"></canvas>
+    </div>
 </div>
 
-<script src="script.js"></script>
+<script>
+    const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
+    let myChart;
+    let isFetching = false;
+
+    // Initialize Chart
+    const ctx = document.getElementById('myChart').getContext('2d');
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', tension: 0.3 },
+                { label: 'Vib (G)', data: [], borderColor: '#22c55e', tension: 0.3 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, animation: false }
+    });
+
+    async function fetchData() {
+        if (isFetching) return;
+        isFetching = true;
+        try {
+            const res = await fetch(url + "?read=true&t=" + Date.now());
+            const data = await res.json();
+
+            // Update Labels
+            document.getElementById("temp-value").innerText = parseFloat(data.temp).toFixed(1);
+            document.getElementById("vib-value").innerText = parseFloat(data.vibration).toFixed(3);
+            document.getElementById("status-label").innerText = "TEMP: " + data.tempStatus;
+            document.getElementById("ai-action-step").innerText = "VIB: " + data.vibStatus;
+
+            // Update Chart
+            const time = new Date().toLocaleTimeString();
+            myChart.data.labels.push(time);
+            myChart.data.datasets[0].data.push(data.temp);
+            myChart.data.datasets[1].data.push(data.vibration);
+            if (myChart.data.labels.length > 15) {
+                myChart.data.labels.shift();
+                myChart.data.datasets.forEach(d => d.data.shift());
+            }
+            myChart.update();
+
+            document.getElementById("sync-status").innerText = "LIVE";
+            document.getElementById("sync-status").style.color = "#22c55e";
+        } catch (e) {
+            document.getElementById("sync-status").innerText = "OFFLINE";
+            document.getElementById("sync-status").style.color = "#ef4444";
+        }
+        isFetching = false;
+    }
+
+    setInterval(fetchData, 3000); // Fetch every 3s
+</script>
+
 </body>
 </html>
