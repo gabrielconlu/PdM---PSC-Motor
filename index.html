@@ -11,49 +11,46 @@
             --text-primary: #f8fafc; --text-secondary: #94a3b8;
             --accent-blue: #3b82f6; --accent-green: #22c55e; --accent-red: #ef4444;
         }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-primary); padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-primary); padding: 20px; margin: 0; }
         .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        
-        .header { text-align: center; margin-bottom: 10px; }
-        #sync-status { font-size: 0.8rem; font-weight: bold; }
-
+        .header { text-align: center; padding: 10px; }
+        #sync-status { font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
         .ai-box { 
             background: var(--card-bg); padding: 20px; border-radius: 12px; 
             border-left: 5px solid var(--accent-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
         #status-label { font-size: 1.2rem; font-weight: 800; color: var(--accent-blue); margin-bottom: 5px; }
         #ai-action-step { color: var(--text-secondary); font-size: 0.9rem; }
-
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: var(--card-bg); padding: 30px 10px; border-radius: 12px; text-align: center; }
-        .label { color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 1px; margin-bottom: 10px; }
-        .value { font-size: 3rem; font-weight: 800; font-family: monospace; }
+        .card { background: var(--card-bg); padding: 30px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .label { color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+        .value { font-size: 3rem; font-weight: 800; font-family: 'Consolas', monospace; }
         .unit { font-size: 1rem; color: var(--text-secondary); }
-
-        .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; height: 350px; }
+        .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; height: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        @media (max-width: 600px) { .metrics-grid { grid-template-columns: 1fr; } .value { font-size: 2.5rem; } }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h2>MOTOR MONITORING SYSTEM</h2>
-        <div id="sync-status">CONNECTING...</div>
+        <h2 style="letter-spacing: 2px;">MOTOR MONITORING SYSTEM</h2>
+        <div id="sync-status">INITIALIZING...</div>
     </div>
 
     <div class="ai-box">
-        <div id="status-label">INITIALIZING</div>
-        <div id="ai-action-step">Waiting for data from ESP32...</div>
+        <div id="status-label">SYSTEM READY</div>
+        <div id="ai-action-step">Waiting for incoming data from cloud...</div>
     </div>
 
     <div class="metrics-grid">
         <div class="card">
-            <div class="label">TEMPERATURE</div>
+            <div class="label">Temperature</div>
             <div class="value" id="temp-value" style="color:var(--accent-red)">0.0</div>
             <span class="unit">°C</span>
         </div>
         <div class="card">
-            <div class="label">VIBRATION</div>
+            <div class="label">Vibration</div>
             <div class="value" id="vib-value" style="color:var(--accent-green)">0.000</div>
             <span class="unit">G</span>
         </div>
@@ -69,18 +66,22 @@
     let myChart;
     let isFetching = false;
 
-    // Initialize Chart
     const ctx = document.getElementById('myChart').getContext('2d');
     myChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', tension: 0.3 },
-                { label: 'Vib (G)', data: [], borderColor: '#22c55e', tension: 0.3 }
+                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
+                { label: 'Vib (G)', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', fill: true, tension: 0.3 }
             ]
         },
-        options: { responsive: true, maintainAspectRatio: false, animation: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            animation: false,
+            scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } }
+        }
     });
 
     async function fetchData() {
@@ -90,17 +91,18 @@
             const res = await fetch(url + "?read=true&t=" + Date.now());
             const data = await res.json();
 
-            // Update Labels
+            if (data.error) throw new Error(data.error);
+
             document.getElementById("temp-value").innerText = parseFloat(data.temp).toFixed(1);
             document.getElementById("vib-value").innerText = parseFloat(data.vibration).toFixed(3);
             document.getElementById("status-label").innerText = "TEMP: " + data.tempStatus;
             document.getElementById("ai-action-step").innerText = "VIB: " + data.vibStatus;
 
-            // Update Chart
-            const time = new Date().toLocaleTimeString();
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             myChart.data.labels.push(time);
             myChart.data.datasets[0].data.push(data.temp);
             myChart.data.datasets[1].data.push(data.vibration);
+            
             if (myChart.data.labels.length > 15) {
                 myChart.data.labels.shift();
                 myChart.data.datasets.forEach(d => d.data.shift());
@@ -116,7 +118,8 @@
         isFetching = false;
     }
 
-    setInterval(fetchData, 3000); // Fetch every 3s
+    setInterval(fetchData, 3000);
+    fetchData();
 </script>
 
 </body>
