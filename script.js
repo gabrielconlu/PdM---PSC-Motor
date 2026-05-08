@@ -1,4 +1,5 @@
-const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
+const url =
+    "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
 
 let myChart;
 let fetchInterval;
@@ -15,16 +16,19 @@ window.addEventListener("load", () => {
 // ================= CHART =================
 function initChart() {
 
-    const ctx = document.getElementById("myChart").getContext("2d");
+    const ctx =
+        document.getElementById("myChart").getContext("2d");
 
     myChart = new Chart(ctx, {
 
         type: "line",
 
         data: {
+
             labels: [],
 
             datasets: [
+
                 {
                     label: "Temperature (°C)",
                     data: [],
@@ -74,6 +78,41 @@ function startAutoFetch() {
         setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
+// ================= CONDITION ENGINE =================
+const conditionRules = [
+
+    {
+        condition: (t, v) =>
+            t.includes("temp_overheating") &&
+            v.includes("vib_blocked_bearing"),
+
+        status: "MULTIPLE FAULT CONDITIONS DETECTED",
+
+        action:
+            "Recommended Maintenance: Immediately inspect motor bearings, lubrication system, cooling system, airflow path, and overall motor load condition."
+    },
+
+    {
+        condition: (t, v) =>
+            v.includes("vib_blocked_bearing"),
+
+        status: "BLOCKED BEARING DETECTED",
+
+        action:
+            "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary."
+    },
+
+    {
+        condition: (t, v) =>
+            t.includes("temp_overheating"),
+
+        status: "OVERHEATING DETECTED",
+
+        action:
+            "Recommended Maintenance: Inspect motor cooling system, check airflow obstruction, verify capacitor health, and reduce overload operation."
+    }
+];
+
 // ================= FETCH DATA =================
 async function fetchLatestData() {
 
@@ -98,7 +137,6 @@ async function fetchLatestData() {
         ) {
 
             updateStatus("ERROR", "#ef4444");
-
             isFetching = false;
             return;
         }
@@ -107,19 +145,14 @@ async function fetchLatestData() {
         let data;
 
         try {
-
             data = JSON.parse(text);
-
         } catch {
-
             console.warn("Invalid JSON");
-
             isFetching = false;
             return;
         }
 
         if (!data) {
-
             isFetching = false;
             return;
         }
@@ -154,7 +187,9 @@ async function fetchLatestData() {
 
             myChart.data.labels.shift();
 
-            myChart.data.datasets.forEach(d => d.data.shift());
+            myChart.data.datasets.forEach(d =>
+                d.data.shift()
+            );
         }
 
         myChart.update();
@@ -162,60 +197,36 @@ async function fetchLatestData() {
         // ================= FPGA STATUS =================
         const tempStatus =
             (data.tempStatus || "")
-            .toString()
-            .trim()
-            .toLowerCase();
+                .toString()
+                .trim()
+                .toLowerCase();
 
         const vibStatus =
             (data.vibStatus || "")
-            .toString()
-            .trim()
-            .toLowerCase();
+                .toString()
+                .trim()
+                .toLowerCase();
 
         console.log("TEMP STATUS:", tempStatus);
         console.log("VIB STATUS:", vibStatus);
 
+        // ================= DEFAULT STATE =================
         let systemStatus =
             "NORMAL OPERATION";
 
         let maintenanceAction =
             "System running with real-time sensor feed.";
 
-        // ================= BOTH FAULTS =================
-        if (
-            tempStatus.includes("temp_overheating") &&
-            vibStatus.includes("vib_blocked_bearing")
-        ) {
+        // ================= RULE ENGINE EVALUATION =================
+        for (const rule of conditionRules) {
 
-            systemStatus =
-                "MULTIPLE FAULT CONDITIONS DETECTED";
+            if (rule.condition(tempStatus, vibStatus)) {
 
-            maintenanceAction =
-                "Recommended Maintenance: Immediately inspect motor bearings, lubrication, cooling system, airflow path, and overall motor load condition.";
-        }
+                systemStatus = rule.status;
+                maintenanceAction = rule.action;
 
-        // ================= BLOCKED BEARING =================
-        else if (
-            vibStatus.includes("vib_blocked_bearing")
-        ) {
-
-            systemStatus =
-                "BLOCKED BEARING DETECTED";
-
-            maintenanceAction =
-                "Recommended Maintenance: Inspect bearing condition, check lubrication, remove shaft obstruction, and replace damaged bearing if necessary.";
-        }
-
-        // ================= OVERHEATING =================
-        else if (
-            tempStatus.includes("temp_overheating")
-        ) {
-
-            systemStatus =
-                "OVERHEATING DETECTED";
-
-            maintenanceAction =
-                "Recommended Maintenance: Inspect motor cooling, check airflow obstruction, inspect capacitor condition, and reduce prolonged overload operation.";
+                break;
+            }
         }
 
         // ================= DISPLAY =================
