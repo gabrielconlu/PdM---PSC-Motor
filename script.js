@@ -1,9 +1,7 @@
-const url =
-    "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
+const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
 let myChart;
 let isFetching = false;
 
-// 1. Initialize ang Chart pag-load ng page
 window.onload = () => {
     const ctx = document.getElementById('myChart').getContext('2d');
     myChart = new Chart(ctx, {
@@ -43,12 +41,10 @@ window.onload = () => {
         }
     });
 
-    // Simulan ang auto-fetch
     setInterval(fetchLatestData, 3000);
     fetchLatestData();
 };
 
-// 2. Function para kumuha ng data sa Cloud
 async function fetchLatestData() {
     if (isFetching) return;
     isFetching = true;
@@ -59,28 +55,53 @@ async function fetchLatestData() {
 
         if (data.error) throw new Error(data.error);
 
-        // Update ang mga Numeros sa Dashboard
+        // 1. Update Numerical Values
         document.getElementById("temp-value").innerText = parseFloat(data.temp).toFixed(1);
         document.getElementById("vib-value").innerText = parseFloat(data.vibration).toFixed(3);
         
-        // Update ang Status Text (mula sa FPGA)
-        document.getElementById("status-label").innerText = "TEMP: " + data.tempStatus;
-        document.getElementById("ai-action-step").innerText = "VIB: " + data.vibStatus;
+        // 2. MAINTENANCE ENGINE (Logic based on Google Sheet Status)
+        const tStatus = data.tempStatus; 
+        const vStatus = data.vibStatus;
+        
+        let mainStatusText = "SYSTEM NORMAL";
+        let adviceText = "Motor is running within safe parameters.";
+        let themeColor = "#3b82f6"; // Default Blue
 
-        // Update ang Graph
+        if (tStatus === "OVERHEATING" && vStatus === "BLOCKED_BEARING") {
+            mainStatusText = "CRITICAL: DOUBLE FAULT";
+            adviceText = "SHUTDOWN IMMEDIATELY! Check bearings and cooling system.";
+            themeColor = "#ef4444"; // Red
+        } else if (tStatus === "OVERHEATING") {
+            mainStatusText = "WARNING: OVERHEATING";
+            adviceText = "Check cooling fan and air vents for obstructions.";
+            themeColor = "#fbbf24"; // Yellow
+        } else if (vStatus === "BLOCKED_BEARING") {
+            mainStatusText = "WARNING: BLOCKED BEARING";
+            adviceText = "Lubricate motor shaft or check for mechanical blockages.";
+            themeColor = "#fbbf24"; // Yellow
+        }
+
+        // Apply Logic to HTML Elements
+        const labelEl = document.getElementById("status-label");
+        const adviceEl = document.getElementById("ai-action-step");
+        
+        labelEl.innerText = mainStatusText;
+        labelEl.style.color = themeColor;
+        adviceEl.innerText = adviceText;
+
+        // 3. Update Chart
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         myChart.data.labels.push(time);
         myChart.data.datasets[0].data.push(data.temp);
         myChart.data.datasets[1].data.push(data.vibration);
         
-        // Panatilihing 15 points lang ang nakikita sa graph para hindi mag-lag
         if (myChart.data.labels.length > 15) {
             myChart.data.labels.shift();
             myChart.data.datasets.forEach(d => d.data.shift());
         }
         myChart.update();
 
-        // Sync Status Indicator
+        // 4. Sync Status Indicator
         const sync = document.getElementById("sync-status");
         sync.innerText = "● LIVE";
         sync.style.color = "#22c55e";
