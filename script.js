@@ -24,11 +24,8 @@ function initChart() {
         type: "line",
 
         data: {
-
             labels: [],
-
             datasets: [
-
                 {
                     label: "Temperature (°C)",
                     data: [],
@@ -36,7 +33,6 @@ function initChart() {
                     borderWidth: 2,
                     tension: 0.3
                 },
-
                 {
                     label: "Vibration (G)",
                     data: [],
@@ -48,24 +44,18 @@ function initChart() {
         },
 
         options: {
-
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-
             scales: {
-                y: {
-                    beginAtZero: true
-                },
-                x: {
-                    display: true
-                }
+                y: { beginAtZero: true },
+                x: { display: true }
             }
         }
     });
 }
 
-// ================= AUTO FETCH =================
+// ================= START =================
 function startAutoFetch() {
 
     if (fetchInterval)
@@ -77,8 +67,8 @@ function startAutoFetch() {
         setInterval(fetchLatestData, FETCH_INTERVAL_MS);
 }
 
-// ================= CONDITION INTERPRETER (FPGA-BASED) =================
-function interpretFPGAStatus(tempStatus, vibStatus) {
+// ================= SIMPLE CONDITION DISPLAY =================
+function getMaintenanceOutput(tempStatus, vibStatus) {
 
     const t =
         (tempStatus || "").toUpperCase().trim();
@@ -86,13 +76,13 @@ function interpretFPGAStatus(tempStatus, vibStatus) {
     const v =
         (vibStatus || "").toUpperCase().trim();
 
-    // ================= CRITICAL COMBINATION =================
+    // ================= BOTH FAULTS =================
     if (t === "OVERHEATING" && v === "BLOCKED_BEARING") {
 
         return {
-            status: "CRITICAL FAULT: OVERHEATING + BLOCKED BEARING",
+            status: "OVERHEATING + BLOCKED BEARING",
             action:
-                "Immediate shutdown recommended. FPGA detected thermal runaway combined with mechanical blockage. Inspect bearings, lubrication system, cooling fan, and motor load condition."
+                "Critical: Check cooling system, lubrication, bearing damage, and motor load immediately."
         };
     }
 
@@ -100,9 +90,9 @@ function interpretFPGAStatus(tempStatus, vibStatus) {
     if (v === "BLOCKED_BEARING") {
 
         return {
-            status: "BLOCKED BEARING DETECTED (FPGA)",
+            status: "BLOCKED BEARING DETECTED",
             action:
-                "Mechanical obstruction detected. Inspect bearing wear, lubrication failure, shaft misalignment, and replace bearing if abnormal resistance persists."
+                "Inspect bearing wear, lubrication failure, shaft obstruction, and replace bearing if needed."
         };
     }
 
@@ -110,17 +100,17 @@ function interpretFPGAStatus(tempStatus, vibStatus) {
     if (t === "OVERHEATING") {
 
         return {
-            status: "OVERHEATING DETECTED (FPGA)",
+            status: "OVERHEATING DETECTED",
             action:
-                "Thermal anomaly detected. Check cooling system, airflow blockage, capacitor health, and motor overload conditions."
+                "Check cooling fan, airflow blockage, and motor overload condition."
         };
     }
 
     // ================= NORMAL =================
     return {
-        status: "NORMAL OPERATION",
+        status: "NORMAL",
         action:
-            "System operating within FPGA-defined safe thresholds. No maintenance required."
+            "System operating normally."
     };
 }
 
@@ -135,39 +125,20 @@ async function fetchLatestData() {
         const response =
             await fetch(url + "?read=true&t=" + Date.now());
 
-        const text = await response.text();
-
-        if (!text || text.includes("ERROR")) {
-
-            updateStatus("ERROR", "#ef4444");
-            isFetching = false;
-            return;
-        }
-
         const data =
-            JSON.parse(text);
+            await response.json();
 
-        // ================= SENSOR VALUES =================
         const temp =
             parseFloat(data.temp) || 0;
 
         const vib =
             parseFloat(data.vibration) || 0;
 
-        document.getElementById("temp-display").innerText =
-            temp.toFixed(1);
-
-        document.getElementById("vib-display").innerText =
-            vib.toFixed(3);
-
-        updateStatus("LIVE", "#22c55e");
-
-        // ================= CHART UPDATE =================
+        // ================= CHART =================
         const time =
             new Date().toLocaleTimeString();
 
         myChart.data.labels.push(time);
-
         myChart.data.datasets[0].data.push(temp);
         myChart.data.datasets[1].data.push(vib);
 
@@ -182,25 +153,20 @@ async function fetchLatestData() {
 
         myChart.update();
 
-        // ================= FPGA STATUS FROM SHEETS =================
-        const tempStatus =
-            data.tempStatus;
-
-        const vibStatus =
-            data.vibStatus;
-
-        console.log("FPGA TEMP STATUS:", tempStatus);
-        console.log("FPGA VIB STATUS:", vibStatus);
-
-        // ================= CONDITION ASSESSMENT =================
+        // ================= FPGA OUTPUT ONLY =================
         const result =
-            interpretFPGAStatus(tempStatus, vibStatus);
+            getMaintenanceOutput(
+                data.tempStatus,
+                data.vibStatus
+            );
 
         document.getElementById("status-label").innerText =
             result.status;
 
         document.getElementById("ai-action-step").innerText =
             result.action;
+
+        updateStatus("LIVE", "#22c55e");
 
     } catch (err) {
 
@@ -211,7 +177,7 @@ async function fetchLatestData() {
     isFetching = false;
 }
 
-// ================= STATUS UI =================
+// ================= STATUS =================
 function updateStatus(text, color) {
 
     const el =
