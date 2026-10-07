@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: psc-motor-health-monitor
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
