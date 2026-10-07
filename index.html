@@ -1,126 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PSC Motor Health Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --bg-color: #0f172a; --card-bg: #1e293b;
-            --text-primary: #f8fafc; --text-secondary: #94a3b8;
-            --accent-blue: #3b82f6; --accent-green: #22c55e; --accent-red: #ef4444;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-primary); padding: 20px; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        .header { text-align: center; padding: 10px; }
-        #sync-status { font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
-        .ai-box { 
-            background: var(--card-bg); padding: 20px; border-radius: 12px; 
-            border-left: 5px solid var(--accent-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        #status-label { font-size: 1.2rem; font-weight: 800; color: var(--accent-blue); margin-bottom: 5px; }
-        #ai-action-step { color: var(--text-secondary); font-size: 0.9rem; }
-        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: var(--card-bg); padding: 30px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-        .label { color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
-        .value { font-size: 3rem; font-weight: 800; font-family: 'Consolas', monospace; }
-        .unit { font-size: 1rem; color: var(--text-secondary); }
-        .chart-box { background: var(--card-bg); padding: 20px; border-radius: 12px; height: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        @media (max-width: 600px) { .metrics-grid { grid-template-columns: 1fr; } .value { font-size: 2.5rem; } }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSC Motor Predictive Maintenance</title>
+
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
 
-<div class="container">
-    <div class="header">
-        <h2 style="letter-spacing: 2px;">PSC MOTOR MONITORING SYSTEM</h2>
-        <div id="sync-status">INITIALIZING...</div>
-    </div>
+<div class="app">
 
-    <div class="ai-box">
-        <div id="status-label">SYSTEM READY</div>
-        <div id="ai-action-step">Waiting for incoming data from cloud...</div>
-    </div>
-
-    <div class="metrics-grid">
-        <div class="card">
-            <div class="label">Temperature</div>
-            <div class="value" id="temp-value" style="color:var(--accent-red)">0.0</div>
-            <span class="unit">°C</span>
+    <header class="topbar">
+        <div>
+            <h1>PSC Motor Predictive Maintenance</h1>
         </div>
-        <div class="card">
-            <div class="label">Vibration</div>
-            <div class="value" id="vib-value" style="color:var(--accent-green)">0.000</div>
-            <span class="unit">G</span>
-        </div>
-    </div>
 
-    <div class="chart-box">
-        <canvas id="myChart"></canvas>
-    </div>
+        <div id="system-status" class="badge normal">NORMAL</div>
+    </header>
+
+    <section id="alerts">
+
+        <div id="tempAlert" class="alert-box normal">
+            <h3>Temperature Status</h3>
+            <p id="tempWarningText">Normal</p>
+            <div id="tempReco">No maintenance required</div>
+        </div>
+
+        <div id="vibAlert" class="alert-box normal">
+            <h3>Vibration Status</h3>
+            <p id="vibWarningText">Normal</p>
+            <div id="vibReco">No maintenance required</div>
+        </div>
+
+    </section>
+
+    <section class="grid-4">
+
+        <div class="card">
+            <h3>Temp Real-time</h3>
+            <div id="temp" class="value red">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Temp Predicted</h3>
+            <div id="predTemp" class="value amber">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Vib Real-time</h3>
+            <div id="vib" class="value green">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Vib Predicted</h3>
+            <div id="predVib" class="value blue">--</div>
+        </div>
+
+    </section>
+
+    <section class="grid-2">
+
+        <div class="panel">
+            <h2>Temperature Real-time</h2>
+            <canvas id="tempRealChart"></canvas>
+        </div>
+
+        <div class="panel">
+            <h2>Temperature Predicted</h2>
+            <canvas id="tempPredChart"></canvas>
+        </div>
+
+        <div class="panel">
+            <h2>Vibration Real-time</h2>
+            <canvas id="vibRealChart"></canvas>
+        </div>
+
+        <div class="panel">
+            <h2>Vibration Predicted</h2>
+            <canvas id="vibPredChart"></canvas>
+        </div>
+
+    </section>
+
+    <!-- LOG -->
+    <section class="log">
+        <h2>System Log</h2>
+        <div id="logText">Waiting for FPGA stream...</div>
+    </section>
+
 </div>
 
-<script>
-    const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
-    let myChart;
-    let isFetching = false;
-
-    const ctx = document.getElementById('myChart').getContext('2d');
-    myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
-                { label: 'Vib (G)', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', fill: true, tension: 0.3 }
-            ]
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            animation: false,
-            scales: { y: { grid: { color: '#334155' } }, x: { grid: { display: false } } }
-        }
-    });
-
-    async function fetchData() {
-        if (isFetching) return;
-        isFetching = true;
-        try {
-            const res = await fetch(url + "?read=true&t=" + Date.now());
-            const data = await res.json();
-
-            if (data.error) throw new Error(data.error);
-
-            document.getElementById("temp-value").innerText = parseFloat(data.temp).toFixed(1);
-            document.getElementById("vib-value").innerText = parseFloat(data.vibration).toFixed(3);
-            document.getElementById("status-label").innerText = "TEMP: " + data.tempStatus;
-            document.getElementById("ai-action-step").innerText = "VIB: " + data.vibStatus;
-
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            myChart.data.labels.push(time);
-            myChart.data.datasets[0].data.push(data.temp);
-            myChart.data.datasets[1].data.push(data.vibration);
-            
-            if (myChart.data.labels.length > 15) {
-                myChart.data.labels.shift();
-                myChart.data.datasets.forEach(d => d.data.shift());
-            }
-            myChart.update();
-
-            document.getElementById("sync-status").innerText = "LIVE";
-            document.getElementById("sync-status").style.color = "#22c55e";
-        } catch (e) {
-            document.getElementById("sync-status").innerText = "OFFLINE";
-            document.getElementById("sync-status").style.color = "#ef4444";
-        }
-        isFetching = false;
-    }
-
-    setInterval(fetchData, 3000);
-    fetchData();
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>

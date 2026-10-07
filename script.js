@@ -1,139 +1,266 @@
-const url = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
-let myChart;
-let isFetching = false;
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzxW6ws7_0IXkqLIeXO6DVeJGnnKudpSJyZUYk4-Nt2yvR16gtCzpK__0gfCqWfxTke/exec";
 
-// 1. Initialize Dashboard & Chart
+const MAX_POINTS = 40;
+const HORIZON_MIN = 3;
+
+
+const DATA_TIMEOUT_MIN = 5;
+
+let tempReal, tempPred, vibReal, vibPred;
+
 window.onload = () => {
-    const ctx = document.getElementById('myChart').getContext('2d');
-    myChart = new Chart(ctx, {
-        type: 'line',
+
+    tempReal = createChart("tempRealChart", "Temp Real", "#ef4444");
+    tempPred = createChart("tempPredChart", "Temp Pred", "#f59e0b");
+
+    vibReal  = createChart("vibRealChart", "Vib Real", "#10b981");
+    vibPred  = createChart("vibPredChart", "Vib Pred", "#3b82f6");
+
+    fetchData();
+
+    setInterval(fetchData, 3000);
+};
+
+async function fetchData() {
+
+    try {
+
+        const res = await fetch(GAS_URL + "?read=true");
+        const d = await res.json();
+
+        // =========================
+        // CHECK DATA FRESHNESS
+        // =========================
+        const dataTime = new Date(d.timestamp);
+        const now = new Date();
+
+        const ageMinutes =
+            (now.getTime() - dataTime.getTime()) / 60000;
+
+        // if stale -> reset dashboard
+        if (isNaN(ageMinutes) || ageMinutes > DATA_TIMEOUT_MIN) {
+
+            resetDashboard();
+
+            setLog("No recent FPGA data.");
+
+            return;
+        }
+
+        updateUI(d);
+
+    } catch {
+
+        resetDashboard();
+
+        setLog("FPGA disconnected.");
+    }
+}
+
+function resetDashboard() {
+
+    set("temp", "0.00°C");
+    set("vib", "0.000 G");
+
+    set("predTemp", "0.00°C");
+    set("predVib", "0.000 G");
+
+    const badge = document.getElementById("system-status");
+
+    badge.className = "badge normal";
+    badge.innerText = "OFFLINE";
+
+    renderAlert(
+        "tempAlert",
+        "tempWarningText",
+        "tempReco",
+        "N",
+        "TEMPERATURE"
+    );
+
+    renderAlert(
+        "vibAlert",
+        "vibWarningText",
+        "vibReco",
+        "N",
+        "VIBRATION"
+    );
+}
+
+function updateUI(d) {
+
+    const temp = Number(d.temp ?? 0);
+    const vib  = Number(d.vibration ?? 0);
+
+    const predTemp = Number(d.predTemp ?? 0);
+    const predVib  = Number(d.predVib ?? 0);
+
+    const tStatus = (d.tempStatus ?? "N").trim();
+    const vStatus = (d.vibStatus ?? "N").trim();
+
+    set("temp", temp.toFixed(2) + "°C");
+    set("vib", vib.toFixed(3) + " G");
+
+    set("predTemp", predTemp.toFixed(2) + "°C");
+    set("predVib", predVib.toFixed(3) + " G");
+
+    // =========================
+    // GLOBAL STATUS
+    // =========================
+    let system =
+        (tStatus === "T" || vStatus === "B") ? "critical" :
+        (tStatus === "W" || vStatus === "W") ? "warning" :
+        "normal";
+
+    const badge = document.getElementById("system-status");
+
+    badge.className = "badge " + system;
+    badge.innerText = system.toUpperCase();
+
+    // =========================
+    // TEMP ALERT
+    // =========================
+    renderAlert(
+        "tempAlert",
+        "tempWarningText",
+        "tempReco",
+        tStatus,
+        "TEMPERATURE"
+    );
+
+    // =========================
+    // VIB ALERT
+    // =========================
+    renderAlert(
+        "vibAlert",
+        "vibWarningText",
+        "vibReco",
+        vStatus,
+        "VIBRATION"
+    );
+
+    const now = new Date();
+
+    const realTime =
+        now.toLocaleTimeString();
+
+    const predTime =
+        new Date(
+            now.getTime() + HORIZON_MIN * 60000
+        ).toLocaleTimeString();
+
+    // =========================
+    // PUSH REAL DATA
+    // =========================
+    push(tempReal, realTime, temp);
+    push(vibReal, realTime, vib);
+
+    // =========================
+    // PUSH PREDICTED DATA
+    // =========================
+    push(tempPred, predTime, predTemp);
+    push(vibPred, predTime, predVib);
+
+    setLog("FPGA predictive maintenance active.");
+}
+
+/* =========================
+   ALERT ENGINE
+========================= */
+function renderAlert(boxId, textId, recoId, status, type) {
+
+    const box = document.getElementById(boxId);
+
+    let state = "NORMAL";
+    let reco = "No maintenance required.";
+
+    if (status === "W") {
+
+        state = "WARNING";
+
+        reco =
+            `Monitor ${type.toLowerCase()} trend. Schedule inspection.`;
+
+        box.className = "alert-box warning";
+    }
+    else if (status === "T" || status === "B") {
+
+        state = "CRITICAL";
+
+        reco =
+            `Immediate maintenance required for ${type.toLowerCase()}.`;
+
+        box.className = "alert-box critical";
+    }
+    else {
+
+        box.className = "alert-box normal";
+    }
+
+    document.getElementById(textId).innerText = state;
+    document.getElementById(recoId).innerText = reco;
+}
+
+/* =========================
+   CHART
+========================= */
+function createChart(id, label, color) {
+
+    return new Chart(document.getElementById(id), {
+
+        type: "line",
+
         data: {
             labels: [],
-            datasets: [
-                {
-                    label: 'Temperature (°C)',
-                    data: [],
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    fill: true,
-                    tension: 0.3
-                },
-                {
-                    label: 'Vibration (G)',
-                    data: [],
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    fill: true,
-                    tension: 0.3
-                }
-            ]
+            datasets: [{
+                label: label,
+                data: [],
+                borderColor: color,
+                backgroundColor: color,
+                borderWidth: 2,
+                pointRadius: 2,
+                fill: false,
+                tension: 0.35
+            }]
         },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            animation: false,
-            scales: {
-                y: { 
-                    grid: { color: 'rgba(255,255,255,0.05)' }, 
-                    ticks: { color: '#94a3b8' } 
-                },
-                x: { 
-                    grid: { display: false }, 
-                    ticks: { color: '#94a3b8' } 
-                }
+
+        options: {
+
+            responsive: true,
+
+            animation: {
+                duration: 300
             },
-            plugins: {
-                legend: { labels: { color: '#f8fafc' } }
+
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
             }
         }
     });
+}
 
-    // Auto-refresh every 3 seconds
-    setInterval(fetchLatestData, 3000);
-    fetchLatestData();
-};
+function push(chart, label, value) {
 
-// 2. Data Fetching & Maintenance Logic
-async function fetchLatestData() {
-    if (isFetching) return;
-    isFetching = true;
+    if (isNaN(value)) return;
 
-    try {
-        const response = await fetch(`${url}?read=true&t=${Date.now()}`);
-        const data = await response.json();
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
 
-        if (data.error) throw new Error(data.error);
+    if (chart.data.labels.length > MAX_POINTS) {
 
-        // --- UPDATE NUMERICAL VALUES ---
-        document.getElementById("temp-value").innerText = parseFloat(data.temp || 0).toFixed(1);
-        document.getElementById("vib-value").innerText = parseFloat(data.vibration || 0).toFixed(3);
-        
-        // --- MAINTENANCE ENGINE ---
-        // Kinukuha ang status na sinulat ng ESP32 sa Google Sheet
-        const tStatus = String(data.tempStatus).toUpperCase(); 
-        const vStatus = String(data.vibStatus).toUpperCase();
-        
-        let mainStatusText = "SYSTEM NORMAL";
-        let adviceText = "Motor is operating within safe parameters. No maintenance needed.";
-        let themeColor = "#3b82f6"; // Blue (Normal)
-
-        // Scenario: Parehong Fault
-        if (tStatus === "OVERHEATING" && vStatus === "BLOCKED_BEARING") {
-            mainStatusText = "CRITICAL: DOUBLE FAULT";
-            adviceText = "SHUTDOWN IMMEDIATELY! Excessive friction & heat detected. Inspect bearings & fan.";
-            themeColor = "#ef4444"; // Red
-        } 
-        // Scenario: Init lang
-        else if (tStatus === "OVERHEATING") {
-            mainStatusText = "WARNING: OVERHEATING";
-            adviceText = "Check air vents for dust or blockage. Verify if the cooling fan is spinning.";
-            themeColor = "#fbbf24"; // Yellow
-        } 
-        // Scenario: Vibration lang
-        else if (vStatus === "BLOCKED_BEARING") {
-            mainStatusText = "WARNING: BLOCKED BEARING";
-            adviceText = "Mechanical friction detected. Lubricate the shaft or check for internal obstructions.";
-            themeColor = "#fbbf24"; // Yellow
-        }
-
-        // Apply Colors and Text to UI
-        const labelEl = document.getElementById("status-label");
-        const adviceEl = document.getElementById("ai-action-step");
-        
-        if (labelEl) {
-            labelEl.innerText = mainStatusText;
-            labelEl.style.color = themeColor;
-        }
-        if (adviceEl) adviceEl.innerText = adviceText;
-
-        // --- UPDATE CHART ---
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        myChart.data.labels.push(time);
-        myChart.data.datasets[0].data.push(data.temp);
-        myChart.data.datasets[1].data.push(data.vibration);
-        
-        // Keep only the last 15 data points to maintain performance
-        if (myChart.data.labels.length > 15) {
-            myChart.data.labels.shift();
-            myChart.data.datasets.forEach(d => d.data.shift());
-        }
-        myChart.update();
-
-        // Sync Indicator
-        const sync = document.getElementById("sync-status");
-        if (sync) {
-            sync.innerText = "● LIVE";
-            sync.style.color = "#22c55e";
-        }
-
-    } catch (e) {
-        console.error("Cloud Sync Error:", e);
-        const sync = document.getElementById("sync-status");
-        if (sync) {
-            sync.innerText = "○ OFFLINE";
-            sync.style.color = "#ef4444";
-        }
-    } finally {
-        isFetching = false;
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
     }
+
+    chart.update();
+}
+
+function set(id, v) {
+    document.getElementById(id).innerText = v;
+}
+
+function setLog(msg) {
+    document.getElementById("logText").innerText = msg;
 }
